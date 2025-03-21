@@ -1,0 +1,57 @@
+body {
+    background-color: #0b192e;
+    color: #ffffff;
+}
+
+.navbar {
+    background-color: #1b2c42 !important;
+}
+
+.card {
+    background-color: #11243a;
+    color: #ffffff;
+    border: none;
+}
+
+.list-group-item {
+    background-color: #1b2c42;
+    border: none;
+}
+
+.list-group-item a {
+    color: #ffffff;
+    text-decoration: none;
+}
+
+.list-group-item:hover {
+    background-color: #2a3e5a;
+}
+
+.footer {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    background-color: #1b2c42;
+    color: white;
+    text-align: center;
+    padding: 10px 0;
+}
+
+.sidebar {
+    position: fixed;
+    left: 0;
+    top: 56px; /* Высота navbar */
+    width: 230px;
+    height: 100vh;
+    background-color: #11243a;
+    padding: 20px;
+}
+
+.container {
+    margin-left: 220px; /* Чтобы контент не заходил под меню */
+}
+
+.navbar-brand img {
+    border-radius: 50%; /* Делает изображение круглым */
+    margin-right: 10px; /* Отступ между изображением и именем */
+}
