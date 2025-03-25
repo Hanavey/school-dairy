@@ -16,11 +16,13 @@ body {
 .list-group-item {
     background-color: #1b2c42;
     border: none;
+    width: 100%;
 }
 
 .list-group-item a {
     color: #ffffff;
     text-decoration: none;
+    display: block;
 }
 
 .list-group-item:hover {
@@ -28,9 +30,6 @@ body {
 }
 
 .footer {
-    position: fixed;
-    bottom: 0;
-    width: 100%;
     background-color: #1b2c42;
     color: white;
     text-align: center;
@@ -38,20 +37,28 @@ body {
 }
 
 .sidebar {
-    position: fixed;
-    left: 0;
-    top: 56px; /* Высота navbar */
-    width: 230px;
-    height: 100vh;
+    height: calc(100vh - 56px); /* Высота минус navbar */
     background-color: #11243a;
     padding: 20px;
 }
 
-.container {
-    margin-left: 220px; /* Чтобы контент не заходил под меню */
+.content-area {
+    padding: 20px;
 }
 
 .navbar-brand img {
-    border-radius: 50%; /* Делает изображение круглым */
-    margin-right: 10px; /* Отступ между изображением и именем */
+    border-radius: 50%;
+    margin-right: 10px;
+}
+
+/* Центрирование контента */
+.container-fluid {
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.navbar-brand.mx-auto {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
 }

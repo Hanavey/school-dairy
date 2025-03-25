@@ -9,3 +9,4 @@ from . import teacher
 from . import teacher_position
 from . import teacher_position_assignment
 from . import user
+from . import admin

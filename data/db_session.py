@@ -5,10 +5,10 @@ from sqlalchemy.orm import Session
 SqlAlchemyBase = orm.declarative_base()
 
 __factory = None
-
+__engine = None  # Добавляем глобальную переменную для движка
 
 def global_init(db_file):
-    global __factory
+    global __factory, __engine
 
     if __factory:
         return
@@ -20,13 +20,17 @@ def global_init(db_file):
     print(f"Подключение к базе данных по адресу {conn_str}")
 
     engine = sa.create_engine(conn_str, echo=True)
+    __engine = engine  # Сохраняем движок в глобальную переменную
     __factory = orm.sessionmaker(bind=engine)
 
     from . import __all_models
 
     SqlAlchemyBase.metadata.create_all(engine)
 
-
 def create_session() -> Session:
     global __factory
     return __factory()
+
+def get_engine():  # Добавляем функцию для получения движка
+    global __engine
+    return __engine

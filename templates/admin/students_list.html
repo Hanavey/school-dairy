@@ -1,0 +1,61 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Строка поиска и сообщение о количестве студентов -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <input type="text" id="searchInput" class="form-control" placeholder="Поиск по имени, фамилии или классу...">
+        </div>
+        <div class="col-md-6 text-md-end text-start mt-2 mt-md-0">
+            <p class="text-light" id="studentCount">Найдено учеников: {{ students|length }}</p>
+        </div>
+    </div>
+
+    <!-- Сетка карточек учеников -->
+    <div class="row" id="studentCards">
+        {% for student in students %}
+        <div class="col-md-4 mb-4 student-card">
+            <a href="/admin/student/{{ student.student_id }}" class="text-decoration-none">
+                <div class="card bg-dark text-light h-100">
+                    <img src="data:image/png;base64,{{ student.profile_picture }}" class="card-img-top" alt="Фото ученика">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">{{ student.last_name }} {{ student.first_name }} {{ student.class_name }}</h5>
+                    </div>
+                </div>
+            </a>
+        </div>
+        {% endfor %}
+
+        <!-- Карточка для создания нового ученика -->
+        <div class="col-md-4 mb-4">
+            <a href="/admin/student/new" class="text-decoration-none">
+                <div class="card bg-dark text-light h-100 d-flex align-items-center justify-content-center">
+                    <i class="bi bi-plus text-white" style="font-size: 4rem;"></i>
+                </div>
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript для фильтрации и обновления счетчика -->
+<script>
+document.getElementById('searchInput').addEventListener('input', function() {
+    const searchText = this.value.toLowerCase();
+    const cards = document.querySelectorAll('.student-card');
+    let visibleCount = 0;
+
+    cards.forEach(card => {
+        const title = card.querySelector('.card-title').textContent.toLowerCase();
+        if (title.includes(searchText)) {
+            card.style.display = 'block';
+            visibleCount++;
+        } else {
+            card.style.display = 'none';
+        }
+    });
+
+    document.getElementById('studentCount').textContent = `Найдено учеников: ${visibleCount}`;
+});
+</script>
+{% endblock %}
