@@ -1,0 +1,148 @@
+{% extends "admin/base.html" %}
+
+{% block title %}
+    Редактирование учителя #{{ teacher.teacher_id }}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="text-light mb-4">Редактирование учителя #{{ teacher.teacher_id }}</h2>
+
+    <!-- Форма редактирования -->
+    <form id="editTeacherForm" method="POST" enctype="multipart/form-data">
+        {{ form.hidden_tag() }}
+        <div class="row">
+            <!-- Левая колонка -->
+            <div class="col-md-6">
+                <div class="mb-3">
+                    {{ form.username.label(class="form-label text-light") }}
+                    {{ form.username(class="form-control") }}
+                    {% for error in form.username.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ form.password.label(class="form-label text-light") }}
+                    {{ form.password(class="form-control") }}
+                    {% for error in form.password.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ form.first_name.label(class="form-label text-light") }}
+                    {{ form.first_name(class="form-control") }}
+                    {% for error in form.first_name.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ form.last_name.label(class="form-label text-light") }}
+                    {{ form.last_name(class="form-control") }}
+                    {% for error in form.last_name.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ form.email.label(class="form-label text-light") }}
+                    {{ form.email(class="form-control") }}
+                    {% for error in form.email.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Правая колонка -->
+            <div class="col-md-6">
+                <div class="mb-3">
+                    {{ form.phone_number.label(class="form-label text-light") }}
+                    {{ form.phone_number(class="form-control") }}
+                    {% for error in form.phone_number.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ form.position_id.label(class="form-label text-light") }}
+                    {{ form.position_id(class="form-select") }}
+                    {% for error in form.position_id.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ form.class_id.label(class="form-label text-light") }}
+                    {{ form.class_id(class="form-select") }}
+                    {% for error in form.class_id.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ form.subject_id.label(class="form-label text-light") }}
+                    {{ form.subject_id(class="form-select") }}
+                    {% for error in form.subject_id.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ form.profile_picture.label(class="form-label text-light") }}
+                    {{ form.profile_picture(class="form-control") }}
+                    {% for error in form.profile_picture.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                    <div class="mt-2" style="width: 300px; height: 197px; overflow: hidden; position: relative;">
+                        <img id="profile_picture_preview" src="data:image/png;base64,{{ teacher.user.profile_picture }}" alt="Текущее фото" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); min-width: 300px; min-height: 197px; object-fit: cover;">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Кнопки -->
+        <div class="d-flex justify-content-between">
+            {{ form.submit(class="btn btn-primary") }}
+            <button type="button" class="btn btn-danger" id="deleteTeacherBtn">Удалить учителя</button>
+            <a href="/admin/teachers" class="btn btn-secondary">Отмена</a>
+        </div>
+    </form>
+</div>
+
+<!-- JavaScript для предпросмотра изображения и отправки форм через AJAX -->
+<script>
+// Обработка удаления учителя
+document.getElementById('deleteTeacherBtn').addEventListener('click', function() {
+    if (confirm('Вы уверены, что хотите удалить этого учителя? Это действие нельзя отменить.')) {
+        const teacherId = {{ teacher.teacher_id }};
+
+        fetch(`/admin/teacher/${teacherId}/delete`, {
+            method: 'POST',
+            credentials: 'include',  // Включаем cookies для сессионной авторизации
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'  // Указываем, что это AJAX-запрос
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                if (response.status === 401 || response.status === 403) {
+                    // Если не авторизован, перенаправляем на страницу логина
+                    window.location.href = '/admin/login';
+                    return;
+                }
+                return response.json().then(data => {
+                    throw new Error(data.description || `HTTP error! Status: ${response.status}`);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.redirect) {
+                window.location.href = data.redirect;
+            } else if (data.message) {
+                alert(data.message);  // Показываем сообщение об успешном удалении
+                window.location.href = '/admin/teachers';  // Перенаправляем вручную
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка:', error);
+            alert('Произошла ошибка при удалении: ' + error.message);
+        });
+    }
+});
+</script>
+{% endblock %}

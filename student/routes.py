@@ -1,10 +1,11 @@
 from flask import render_template, redirect, url_for
 from flask_login import login_required, current_user, login_user, logout_user
 from student import student_bp
-from forms.students import LoginForm
+from forms.students_login import LoginForm
 from data import db_session
 from data.user import User
 from data.student import Student
+from decorators.login_decorator import blueprint_login_required
 
 
 @student_bp.route('/')
@@ -32,7 +33,7 @@ def login():
 
 
 @student_bp.route('/logout')
-@login_required
+@blueprint_login_required('student_bp')
 def logout():
     logout_user()
     return redirect('/student/')

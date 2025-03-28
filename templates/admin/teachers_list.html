@@ -1,39 +1,44 @@
 {% extends "admin/base.html" %}
 
 {% block title %}
-	Список учеников
+    Список учителей
 {% endblock %}
 
 {% block content %}
 <div class="container mt-4">
-    <!-- Строка поиска и сообщение о количестве студентов -->
+    <!-- Строка поиска и сообщение о количестве учителей -->
     <div class="row mb-4">
         <div class="col-md-6">
             <input type="text" id="searchInput" class="form-control" placeholder="Поиск по имени, фамилии или классу...">
         </div>
         <div class="col-md-6 text-md-end text-start mt-2 mt-md-0">
-            <p class="text-light" id="studentCount">Найдено учеников: {{ students|length }}</p>
+            <p class="text-light" id="teacherCount">Найдено учителей: {{ teachers|length }}</p>
         </div>
     </div>
 
-    <!-- Сетка карточек учеников -->
-    <div class="row" id="studentCards">
-        {% for student in students %}
-        <div class="col-md-4 mb-4 student-card">
-            <a href="/admin/student/{{ student.student_id }}" class="text-decoration-none">
+    <!-- Сетка карточек учителей -->
+    <div class="row" id="teacherCards">
+        {% for teacher in teachers %}
+        <div class="col-md-4 mb-4 teacher-card">
+            <a href="/admin/teacher/{{ teacher.teacher_id }}" class="text-decoration-none">
                 <div class="card bg-dark text-light h-100">
-                    <img src="data:image/png;base64,{{ student.profile_picture }}" class="card-img-top" alt="Фото ученика">
+                    <img src="data:image/png;base64,{{ teacher.profile_picture }}" class="card-img-top" alt="Фото учителя">
                     <div class="card-body text-center">
-                        <h5 class="card-title">{{ student.last_name }} {{ student.first_name }} {{ student.class_name }}</h5>
+                        <h5 class="card-title">
+                            {{ teacher.last_name }} {{ teacher.first_name }}
+                            {% if teacher.classes %}
+                                {{ teacher.classes[0].class_name }}
+                            {% endif %}
+                        </h5>
                     </div>
                 </div>
             </a>
         </div>
         {% endfor %}
 
-        <!-- Карточка для создания нового ученика -->
+        <!-- Карточка для создания нового учителя -->
         <div class="col-md-4 mb-4">
-            <a href="/admin/student/new" class="text-decoration-none">
+            <a href="/admin/teacher/new" class="text-decoration-none">
                 <div class="card bg-dark text-light h-100 d-flex align-items-center justify-content-center">
                     <i class="bi bi-plus text-white" style="font-size: 4rem;"></i>
                 </div>
@@ -46,7 +51,7 @@
 <script>
 document.getElementById('searchInput').addEventListener('input', function() {
     const searchText = this.value.toLowerCase();
-    const cards = document.querySelectorAll('.student-card');
+    const cards = document.querySelectorAll('.teacher-card');
     let visibleCount = 0;
 
     cards.forEach(card => {
@@ -59,7 +64,7 @@ document.getElementById('searchInput').addEventListener('input', function() {
         }
     });
 
-    document.getElementById('studentCount').textContent = `Найдено учеников: ${visibleCount}`;
+    document.getElementById('teacherCount').textContent = `Найдено учителей: ${visibleCount}`;
 });
 </script>
 {% endblock %}

@@ -1,0 +1,120 @@
+{% extends "admin/base.html" %}
+
+{% block title %}
+    Создание нового учителя
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="text-light mb-4">Создание нового учителя</h2>
+
+    <!-- Форма создания -->
+    <form id="createTeacherForm" method="POST" enctype="multipart/form-data">
+        {{ form.hidden_tag() }}
+        <div class="row">
+            <!-- Левая колонка -->
+            <div class="col-md-6">
+                <div class="mb-3">
+                    {{ form.username.label(class="form-label text-light") }}
+                    {{ form.username(class="form-control") }}
+                    {% for error in form.username.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ form.password.label(class="form-label text-light") }}
+                    {{ form.password(class="form-control") }}
+                    {% for error in form.password.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ form.first_name.label(class="form-label text-light") }}
+                    {{ form.first_name(class="form-control") }}
+                    {% for error in form.first_name.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ form.last_name.label(class="form-label text-light") }}
+                    {{ form.last_name(class="form-control") }}
+                    {% for error in form.last_name.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ form.email.label(class="form-label text-light") }}
+                    {{ form.email(class="form-control") }}
+                    {% for error in form.email.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Правая колонка -->
+            <div class="col-md-6">
+                <div class="mb-3">
+                    {{ form.phone_number.label(class="form-label text-light") }}
+                    {{ form.phone_number(class="form-control") }}
+                    {% for error in form.phone_number.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ form.position_id.label(class="form-label text-light") }}
+                    {{ form.position_id(class="form-select") }}
+                    {% for error in form.position_id.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ form.class_id.label(class="form-label text-light") }}
+                    {{ form.class_id(class="form-select") }}
+                    {% for error in form.class_id.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ form.subject_id.label(class="form-label text-light") }}
+                    {{ form.subject_id(class="form-select") }}
+                    {% for error in form.subject_id.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ form.profile_picture.label(class="form-label text-light") }}
+                    {{ form.profile_picture(class="form-control") }}
+                    {% for error in form.profile_picture.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                    <div class="mt-2" style="width: 300px; height: 197px; overflow: hidden; position: relative;">
+                        <img id="profile_picture_preview" src="" alt="Предпросмотр фото" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); min-width: 300px; min-height: 197px; object-fit: cover; display: none;">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Кнопки -->
+        <div class="d-flex justify-content-between">
+            {{ form.submit(class="btn btn-primary") }}
+            <a href="/admin/teachers" class="btn btn-secondary">Отмена</a>
+        </div>
+    </form>
+</div>
+
+<!-- JavaScript для предпросмотра изображения -->
+<script>
+document.getElementById('profile_picture').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const preview = document.getElementById('profile_picture_preview');
+            preview.src = e.target.result;
+            preview.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    }
+});
+</script>
+{% endblock %}

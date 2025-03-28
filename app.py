@@ -9,13 +9,17 @@ from teacher import teacher_bp
 from admin import admin_bp
 from api.student_api import StudentScheduleAPI, StudentGradesAPI
 from api.teacher_api import TeacherScheduleAPI, TeacherGradesAPI
-from api.admin_students_api import *
-from api.admin_teachers_api import *
+from api.admin_students_api import AdminOneStudentAPI, AdminAllStudentsAPI
+from api.admin_teachers_api import AdminOneTeacherAPI, AdminAllTeachersAPI
+from api.admin_schedules_api import AdminOneScheduleAPI, AdminAllSchedulesAPI
+from api.admin_subjects_api import AdminSubjectApi, AdminSubjectsApi
+
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'Dairy_SeCrEt_KeY_7634_9723_9872_0909'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db/school_diary.db?check_same_thread=False'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 
 # Инициализация базы данных
 db_session.global_init("db/school_diary.db")
@@ -27,11 +31,12 @@ migrate = Migrate(app, db_session.get_engine(), render_as_batch=True)  # render_
 # Инициализация Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
+login_manager.login_view = 'admin.login'
 
 @login_manager.user_loader
 def load_user(user_id):
     db_sess = db_session.create_session()
-    return db_sess.query(User).get(user_id)
+    return db_sess.query(User).get(int(user_id))
 
 # Регистрация blueprints
 app.register_blueprint(student_bp, url_prefix='/student')
@@ -48,6 +53,10 @@ api.add_resource(AdminOneStudentAPI, '/api/admin/student/<int:student_id>', '/ap
 api.add_resource(AdminAllStudentsAPI, '/api/admin/students')
 api.add_resource(AdminOneTeacherAPI, '/api/admin/teacher/<int:teacher_id>', '/api/admin/teacher')
 api.add_resource(AdminAllTeachersAPI, '/api/admin/teachers')
+api.add_resource(AdminOneScheduleAPI, '/api/admin/schedule/<int:schedule_id>', '/api/admin/schedule')
+api.add_resource(AdminAllSchedulesAPI, '/api/admin/schedules')
+api.add_resource(AdminSubjectApi, '/api/admin/subject/<int:subject_id>', '/api/admin/subject')
+api.add_resource(AdminSubjectsApi, '/api/admin/subjects')
 
 
 # Простая главная страница (опционально)

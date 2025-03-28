@@ -1,0 +1,15 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<h1>Добавить новый предмет</h1>
+{% if message %}
+<p class="text-danger">{{ message }}</p>
+{% endif %}
+<form method="POST">
+    {{ form.hidden_tag() }}
+    <div class="form-group">
+        {{ form.subject_name.label }} {{ form.subject_name(class="form-control") }}
+    </div>
+    {{ form.submit(class="btn btn-primary") }}
+</form>
+{% endblock %}

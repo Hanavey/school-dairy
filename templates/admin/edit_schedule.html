@@ -1,0 +1,71 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<h1>Редактировать запись расписания</h1>
+{% if message %}
+<p class="text-danger">{{ message }}</p>
+{% endif %}
+<form method="POST">
+    {{ form.hidden_tag() }}
+    <div class="form-group">
+        {{ form.class_id.label }} {{ form.class_id(class="form-control") }}
+    </div>
+    <div class="form-group">
+        {{ form.subject_id.label }} {{ form.subject_id(class="form-control") }}
+    </div>
+    <div class="form-group">
+        {{ form.teacher_id.label }} {{ form.teacher_id(class="form-control") }}
+    </div>
+    <div class="form-group">
+        {{ form.day_of_week.label }} {{ form.day_of_week(class="form-control") }}
+    </div>
+    <div class="form-group">
+        {{ form.start_time.label }} {{ form.start_time(class="form-control") }}
+    </div>
+    <div class="form-group">
+        {{ form.end_time.label }} {{ form.end_time(class="form-control") }}
+    </div>
+    {{ form.submit(class="btn btn-primary") }}
+</form>
+<button id="deleteScheduleBtn" class="btn btn-danger">Удалить запись</button>
+
+<script>
+document.getElementById('deleteScheduleBtn').addEventListener('click', function() {
+    if (confirm('Вы уверены, что хотите удалить эту запись расписания? Это действие нельзя отменить.')) {
+        const scheduleId = {{ schedule.schedule_id }};
+
+        fetch(`/admin/schedule/${scheduleId}/delete`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                if (response.status === 401 || response.status === 403) {
+                    window.location.href = '/admin/login';
+                    return;
+                }
+                return response.json().then(data => {
+                    throw new Error(data.description || `HTTP error! Status: ${response.status}`);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.redirect) {
+                window.location.href = data.redirect;
+            } else if (data.message) {
+                alert(data.message);
+                window.location.href = '/admin/schedules';
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка:', error);
+            alert('Произошла ошибка при удалении: ' + error.message);
+        });
+    }
+});
+</script>
+{% endblock %}

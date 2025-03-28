@@ -1,0 +1,67 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<h1>Список предметов</h1>
+<p>{{ message }}</p>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Название предмета</th>
+            <th>Действия</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for subject in subjects %}
+        <tr>
+            <td>{{ subject.subject_id }}</td>
+            <td>{{ subject.subject_name }}</td>
+            <td>
+                <a href="{{ url_for('admin.edit_subject', subject_id=subject.subject_id) }}" class="btn btn-primary">Редактировать</a>
+                <button class="btn btn-danger" onclick="deleteSubject({{ subject.subject_id }})">Удалить</button>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<a href="{{ url_for('admin.new_subject') }}" class="btn btn-success">Добавить предмет</a>
+
+<script>
+function deleteSubject(subjectId) {
+    if (confirm('Вы уверены, что хотите удалить этот предмет? Это действие нельзя отменить.')) {
+        fetch(`/admin/subject/${subjectId}/delete`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                if (response.status === 401 || response.status === 403) {
+                    window.location.href = '/admin/login';
+                    return;
+                }
+                return response.json().then(data => {
+                    throw new Error(data.description || `HTTP error! Status: ${response.status}`);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.redirect) {
+                window.location.href = data.redirect;
+            } else if (data.message) {
+                alert(data.message);
+                window.location.href = '/admin/subjects';
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка:', error);
+            alert('Произошла ошибка при удалении: ' + error.message);
+        });
+    }
+}
+</script>
+{% endblock %}
