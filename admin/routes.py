@@ -8,11 +8,15 @@ from forms.admin_login import LoginForm
 from forms.admin_students import CreateStudentForm, EditStudentForm
 from forms.admin_teachers import CreateTeacherForm, EditTeacherForm
 from forms.admin_schedules import CreateScheduleForm, EditScheduleForm
-from forms.admin_subjects import CreateSubjectForm, EditSubjectForm  # Импортируем формы для предметов
-from api.admin_students_api import AdminOneStudentAPI, AdminAllStudentsAPI
-from api.admin_teachers_api import AdminOneTeacherAPI, AdminAllTeachersAPI
-from api.admin_schedules_api import AdminAllSchedulesAPI, AdminOneScheduleAPI
-from api.admin_subjects_api import AdminSubjectApi, AdminSubjectsApi  # Импортируем API для предметов
+from forms.admin_subjects import CreateSubjectForm, EditSubjectForm
+from forms.user_settings import UserSettingsForm
+from api.admin.admin_students_api import AdminOneStudentAPI, AdminAllStudentsAPI
+from api.admin.admin_teachers_api import AdminOneTeacherAPI, AdminAllTeachersAPI
+from api.admin.admin_schedules_api import AdminAllSchedulesAPI, AdminOneScheduleAPI
+from api.admin.admin_subjects_api import AdminSubjectApi, AdminSubjectsApi
+from api.admin.admin_excel_files import (AdminStudentsExcelFile, AdminTeachersExcelFile, AdminScheduleExcelFile,
+                                         AdminSubjectsExcelFile)
+from api.user_settings_api import UserSettingsAPI
 from sqlalchemy.orm import joinedload
 from data.student import Student
 from data.classes import Class
@@ -35,6 +39,13 @@ def students():
     api = AdminAllStudentsAPI()
     response, status = api.get()
     return render_template('admin/students_list.html', students=response['students'], message=response['message'])
+
+
+@admin_bp.route('/students/excel')
+@blueprint_login_required('admin_bp')
+def students_excel():
+    api = AdminStudentsExcelFile()
+    return api.get()
 
 
 @admin_bp.route('/student/<int:student_id>', methods=['GET', 'POST'])
@@ -190,6 +201,13 @@ def teachers():
     api = AdminAllTeachersAPI()
     response, status = api.get()
     return render_template('admin/teachers_list.html', teachers=response['teachers'], message=response['message'])
+
+
+@admin_bp.route('/teachers/excel')
+@blueprint_login_required('admin_bp')
+def teachers_excel():
+    api = AdminTeachersExcelFile()
+    return api.get()
 
 
 @admin_bp.route('/teacher/<int:teacher_id>', methods=['GET', 'POST'])
@@ -408,6 +426,13 @@ def schedules():
                          time_filter=time_filter, day_filter=day_filter)
 
 
+@admin_bp.route('/schedules/excel', methods=['GET'])
+@blueprint_login_required('admin_bp')
+def excel_schedules():
+    api = AdminScheduleExcelFile()
+    return api.get()
+
+
 @admin_bp.route('/schedule/new', methods=['GET', 'POST'])
 @blueprint_login_required('admin_bp')
 def new_schedule():
@@ -552,6 +577,13 @@ def subjects():
     return render_template('admin/subjects_list.html', subjects=subjects, message=message)
 
 
+@admin_bp.route('/subjects/excel', methods=['GET'])
+@blueprint_login_required('admin_bp')
+def subjects_excel():
+    api = AdminSubjectsExcelFile()
+    return api.get()
+
+
 @admin_bp.route('/subject/new', methods=['GET', 'POST'])
 @blueprint_login_required('admin_bp')
 def new_subject():
@@ -639,23 +671,78 @@ def delete_subject(subject_id):
         db_sess.close()
 
 
+@admin_bp.route('/settings', methods=['GET', 'POST'])
+@blueprint_login_required('admin_bp')
+def settings():
+    """Страница настроек администратора."""
+    form = UserSettingsForm()
+    api = UserSettingsAPI()
+
+    # Определяем username текущего пользователя
+    username = current_user.username
+
+    if form.validate_on_submit():
+        # Формируем данные для обновления
+        update_data = {
+            'first_name': form.first_name.data,
+            'last_name': form.last_name.data,
+            'email': form.email.data,
+            'phone_number': form.phone_number.data,
+        }
+
+        # Обработка фото, если загружено
+        if form.profile_picture.data:
+            file = form.profile_picture.data
+            image_data = base64.b64encode(file.read()).decode('utf-8')
+            update_data['profile_picture'] = image_data
+
+        # Обновление пароля, если указан
+        if form.password.data:
+            update_data['password'] = form.password.data
+
+        # Вызываем метод PATCH из API
+        response, status_code = api.patch(current_user.user_id, username=username, update_data=update_data)
+        if status_code == 200:
+            return redirect('/admin/')
+        else:
+            return render_template('admin/settings.html', form=form, message=response.get('description', 'Ошибка при обновлении'))
+
+    # Для GET-запроса получаем данные профиля через API
+    response, status_code = api.get(current_user.user_id, username=username)
+    if status_code != 200:
+        return render_template('admin/settings.html', form=form, message=response.get('description', 'Ошибка при получении данных профиля'))
+
+    # Заполняем форму данными из API
+    user_data = response['user']
+    form.first_name.data = user_data['first_name']
+    form.last_name.data = user_data['last_name']
+    form.email.data = user_data['email']
+    form.phone_number.data = user_data['phone_number']
+
+    return render_template('admin/settings.html', form=form)
+
+
 @admin_bp.route('/login', methods=['GET', 'POST'])
 def login():
     db_sess = db_session.create_session()
-    if current_user.is_authenticated and db_sess.query(Admin).filter(user=current_user).first():
-        return redirect('/admin/')
-
-    form = LoginForm()
-    if form.validate_on_submit():
-        db_sess = db_session.create_session()
-        user = db_sess.query(User).join(Admin, User.user_id == Admin.user_id).filter(
-            User.username == form.username.data
-        ).first()
-        if user and user.check_password(form.password.data):
-            login_user(user, remember=form.remember_me.data)
+    try:
+        if current_user.is_authenticated and db_sess.query(Admin).filter(Admin.user_id == current_user.user_id).first():
             return redirect('/admin/')
-        return render_template('admin/login.html', form=form, message='Неверный логин или пароль')
-    return render_template('admin/login.html', form=form)
+
+        form = LoginForm()
+        if form.validate_on_submit():
+            db_sess = db_session.create_session()
+            user = db_sess.query(User).join(Admin, User.user_id == Admin.user_id).filter(
+                User.username == form.username.data
+            ).first()
+            if user and user.check_password(form.password.data):
+                login_user(user, remember=form.remember_me.data)
+                return redirect('/admin/')
+            return render_template('admin/login.html', form=form, message='Неверный логин или пароль')
+        return render_template('admin/login.html', form=form)
+
+    finally:
+        db_sess.close()
 
 
 @admin_bp.route('/logout')

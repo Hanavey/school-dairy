@@ -9,10 +9,13 @@ from teacher import teacher_bp
 from admin import admin_bp
 from api.student_api import StudentScheduleAPI, StudentGradesAPI
 from api.teacher_api import TeacherScheduleAPI, TeacherGradesAPI
-from api.admin_students_api import AdminOneStudentAPI, AdminAllStudentsAPI
-from api.admin_teachers_api import AdminOneTeacherAPI, AdminAllTeachersAPI
-from api.admin_schedules_api import AdminOneScheduleAPI, AdminAllSchedulesAPI
-from api.admin_subjects_api import AdminSubjectApi, AdminSubjectsApi
+from api.admin.admin_students_api import AdminOneStudentAPI, AdminAllStudentsAPI
+from api.admin.admin_teachers_api import AdminOneTeacherAPI, AdminAllTeachersAPI
+from api.admin.admin_schedules_api import AdminOneScheduleAPI, AdminAllSchedulesAPI
+from api.admin.admin_subjects_api import AdminSubjectApi, AdminSubjectsApi
+from api.admin.admin_excel_files import (AdminStudentsExcelFile, AdminTeachersExcelFile, AdminSubjectsExcelFile,
+                                         AdminScheduleExcelFile)
+from api.user_settings_api import UserSettingsAPI
 
 
 app = Flask(__name__)
@@ -57,6 +60,11 @@ api.add_resource(AdminOneScheduleAPI, '/api/admin/schedule/<int:schedule_id>', '
 api.add_resource(AdminAllSchedulesAPI, '/api/admin/schedules')
 api.add_resource(AdminSubjectApi, '/api/admin/subject/<int:subject_id>', '/api/admin/subject')
 api.add_resource(AdminSubjectsApi, '/api/admin/subjects')
+api.add_resource(UserSettingsAPI, '/api/user/settings')
+api.add_resource(AdminStudentsExcelFile, '/api/admin/students/excel')
+api.add_resource(AdminTeachersExcelFile, '/api/admin/teachers/excel')
+api.add_resource(AdminScheduleExcelFile, '/api/admin/schedules/excel')
+api.add_resource(AdminSubjectsExcelFile, '/api/admin/subjects/excel')
 
 
 # Простая главная страница (опционально)
@@ -64,7 +72,6 @@ api.add_resource(AdminSubjectsApi, '/api/admin/subjects')
 def index():
     return "Добро пожаловать в школьный дневник! Выберите приложение: <a href='/student'>Для учеников</a> | <a href='/teacher'>Для учителей</a>"
 
-from data.__all_models import *
 
 if __name__ == '__main__':
     app.run(debug=True)
