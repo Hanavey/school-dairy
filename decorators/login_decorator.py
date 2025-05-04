@@ -4,6 +4,7 @@ from functools import wraps
 
 
 def blueprint_login_required(bp_name):
+    """Декоратор для автоматического паренаправления на страницу регистрации"""
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):

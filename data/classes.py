@@ -3,12 +3,14 @@ from sqlalchemy import orm
 from sqlalchemy_serializer import SerializerMixin
 from .db_session import SqlAlchemyBase
 
+
 class Class(SqlAlchemyBase, SerializerMixin):
+    """Таблица для классов"""
     __tablename__ = 'classes'
 
     class_id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, autoincrement=True)
     class_name = sqlalchemy.Column(sqlalchemy.String, nullable=False, unique=True)
-    teacher_id = sqlalchemy.Column(sqlalchemy.Integer, sqlalchemy.ForeignKey("teachers.teacher_id"))
+    teacher_id = sqlalchemy.Column(sqlalchemy.Integer, sqlalchemy.ForeignKey("teachers.teacher_id"), unique=True)
 
     teacher = orm.relationship("Teacher", back_populates="classes")
     students = orm.relationship("Student", back_populates="class_")

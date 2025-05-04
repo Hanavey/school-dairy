@@ -1,66 +1,54 @@
 {% extends "admin/base.html" %}
 
 {% block title %}
-	Список учеников
+    Список учеников
 {% endblock %}
 
 {% block content %}
 <div class="container mt-4">
-    <!-- Строка поиска и сообщение о количестве студентов -->
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <input type="text" id="searchInput" class="form-control" placeholder="Поиск по имени, фамилии или классу...">
-        </div>
-        <div class="col-md-6 text-md-end text-start mt-2 mt-md-0">
-            <p class="text-light" id="studentCount">Найдено учеников: {{ students|length }}</p>
-        </div>
-    </div>
+    <h1 class="text-light mb-4">Список учеников</h1>
 
-    <!-- Сетка карточек учеников -->
-    <div class="row" id="studentCards">
+    <!-- Форма поиска -->
+    <form method="GET" action="{{ url_for('admin.students') }}" class="mb-4">
+        {{ form.hidden_tag() }}
+        <div class="input-group">
+            {{ form.search(class="form-control", placeholder="Поиск по имени, фамилии или классу", value=search_query) }}
+            {{ form.submit(class="btn btn-primary") }}
+        </div>
+    </form>
+
+    <!-- Сетка карточек -->
+    <div class="row">
         {% for student in students %}
-        <div class="col-md-4 mb-4 student-card">
-            <a href="/admin/student/{{ student.student_id }}" class="text-decoration-none">
+        <div class="col-md-4 mb-4">
+            <a href="{{ url_for('admin.edit_student', student_id=student.student_id) }}" class="text-decoration-none">
                 <div class="card bg-dark text-light h-100">
                     <img src="data:image/png;base64,{{ student.profile_picture }}" class="card-img-top" alt="Фото ученика">
                     <div class="card-body text-center">
-                        <h5 class="card-title">{{ student.last_name }} {{ student.first_name }} {{ student.class_name }}</h5>
+                        <h5 class="card-title">{{ student.last_name }} {{ student.first_name }} ({{ student.class.class_name }})</h5>
                     </div>
                 </div>
             </a>
         </div>
         {% endfor %}
-
-        <!-- Карточка для создания нового ученика -->
         <div class="col-md-4 mb-4">
-            <a href="/admin/student/new" class="text-decoration-none">
+            <a href="{{ url_for('admin.new_student') }}" class="text-decoration-none">
                 <div class="card bg-dark text-light h-100 d-flex align-items-center justify-content-center">
-                    <i class="bi bi-plus text-white" style="font-size: 4rem;"></i>
+                    <i class="bi bi-plus" style="font-size: 4rem;"></i>
                 </div>
             </a>
         </div>
-        <a href="/admin/students/excel" class="btn btn-primary">Скачать в формате excel</a>
     </div>
+
+    <!-- Экспорт в Excel -->
+    <a href="{{ url_for('admin.students_excel', search=search_query or '') }}" class="btn btn-primary mb-4">Скачать в Excel</a>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
 </div>
-
-<!-- JavaScript для фильтрации и обновления счетчика -->
-<script>
-document.getElementById('searchInput').addEventListener('input', function() {
-    const searchText = this.value.toLowerCase();
-    const cards = document.querySelectorAll('.student-card');
-    let visibleCount = 0;
-
-    cards.forEach(card => {
-        const title = card.querySelector('.card-title').textContent.toLowerCase();
-        if (title.includes(searchText)) {
-            card.style.display = 'block';
-            visibleCount++;
-        } else {
-            card.style.display = 'none';
-        }
-    });
-
-    document.getElementById('studentCount').textContent = `Найдено учеников: ${visibleCount}`;
-});
-</script>
 {% endblock %}

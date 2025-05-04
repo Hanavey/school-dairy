@@ -3,6 +3,7 @@ from sqlalchemy_serializer import SerializerMixin
 from .db_session import SqlAlchemyBase
 
 class TeacherPosition(SqlAlchemyBase, SerializerMixin):
+    """Таблица для должностей"""
     __tablename__ = 'teacher_positions'
 
     position_id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, autoincrement=True)

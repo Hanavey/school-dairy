@@ -1,3 +1,4 @@
+from . import teacher_position_assignment
 from . import attendance
 from . import classes
 from . import grade
@@ -7,6 +8,6 @@ from . import student
 from . import subject
 from . import teacher
 from . import teacher_position
-from . import teacher_position_assignment
 from . import user
 from . import admin
+from . import teacher_subjects_link

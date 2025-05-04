@@ -5,6 +5,7 @@ from wtforms.validators import DataRequired, Email, Length, Optional
 
 
 class UserSettingsForm(FlaskForm):
+    """Форма для изменения информации пользователя"""
     first_name = StringField('Имя', validators=[DataRequired(), Length(min=2, max=50)])
     last_name = StringField('Фамилия', validators=[DataRequired(), Length(min=2, max=50)])
     email = StringField('Email', validators=[DataRequired(), Email()])

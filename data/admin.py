@@ -3,7 +3,9 @@ from sqlalchemy import orm
 from sqlalchemy_serializer import SerializerMixin
 from .db_session import SqlAlchemyBase
 
+
 class Admin(SqlAlchemyBase, SerializerMixin):
+    """Таблица с администраторами"""
     __tablename__ = 'admins'
 
     user_id = sqlalchemy.Column(sqlalchemy.Integer, sqlalchemy.ForeignKey("users.user_id"), primary_key=True)

@@ -1,30 +1,61 @@
 {% extends "admin/base.html" %}
 
+{% block title %}
+    Создание записи расписания
+{% endblock %}
+
 {% block content %}
-<h1>Создать новую запись расписания</h1>
-{% if message %}
-<p class="text-danger">{{ message }}</p>
-{% endif %}
-<form method="POST">
-    {{ form.hidden_tag() }}
-    <div class="form-group">
-        {{ form.class_id.label }} {{ form.class_id(class="form-control") }}
-    </div>
-    <div class="form-group">
-        {{ form.subject_id.label }} {{ form.subject_id(class="form-control") }}
-    </div>
-    <div class="form-group">
-        {{ form.teacher_id.label }} {{ form.teacher_id(class="form-control") }}
-    </div>
-    <div class="form-group">
-        {{ form.day_of_week.label }} {{ form.day_of_week(class="form-control") }}
-    </div>
-    <div class="form-group">
-        {{ form.start_time.label }} {{ form.start_time(class="form-control") }}
-    </div>
-    <div class="form-group">
-        {{ form.end_time.label }} {{ form.end_time(class="form-control") }}
-    </div>
-    {{ form.submit(class="btn btn-primary") }}
-</form>
+<div class="container mt-4">
+    <h2 class="text-light mb-4">Создание новой записи расписания</h2>
+
+    <form method="POST">
+        {{ form.hidden_tag() }}
+        <div class="mb-3">
+            {{ form.class_id.label(class="form-label text-light") }}
+            {{ form.class_id(class="form-select") }}
+            {% for error in form.class_id.errors %}
+                <span class="text-danger">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="mb-3">
+            {{ form.subject_id.label(class="form-label text-light") }}
+            {{ form.subject_id(class="form-select") }}
+            {% for error in form.subject_id.errors %}
+                <span class="text-danger">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="mb-3">
+            {{ form.teacher_id.label(class="form-label text-light") }}
+            {{ form.teacher_id(class="form-select") }}
+            {% for error in form.teacher_id.errors %}
+                <span class="text-danger">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="mb-3">
+            {{ form.day_of_week.label(class="form-label text-light") }}
+            {{ form.day_of_week(class="form-select") }}
+            {% for error in form.day_of_week.errors %}
+                <span class="text-danger">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="mb-3">
+            {{ form.start_time.label(class="form-label text-light") }}
+            {{ form.start_time(class="form-control") }}
+            {% for error in form.start_time.errors %}
+                <span class="text-danger">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="mb-3">
+            {{ form.end_time.label(class="form-label text-light") }}
+            {{ form.end_time(class="form-control") }}
+            {% for error in form.end_time.errors %}
+                <span class="text-danger">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="d-flex justify-content-between">
+            {{ form.submit(class="btn btn-primary") }}
+            <a href="{{ url_for('admin.schedules') }}" class="btn btn-secondary">Отмена</a>
+        </div>
+    </form>
+</div>
 {% endblock %}

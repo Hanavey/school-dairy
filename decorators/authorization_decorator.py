@@ -1,5 +1,5 @@
 from functools import wraps
-from flask import request, current_app
+from flask import request
 from flask_login import current_user
 from data import db_session
 from data.user import User
@@ -15,17 +15,13 @@ logging.basicConfig(
 
 
 def check_api_key(f):
-    """
-    Декоратор для проверки авторизации
-    """
+    """Декоратор для проверки авторизации"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # Если пользователь аутентифицирован через Flask-Login
         if current_user.is_authenticated:
             kwargs['username'] = current_user.username
             return f(*args, **kwargs)
 
-        # Получаем API ключ из разных источников
         api_key = (
             request.headers.get('X-API-Key') or
             request.args.get('api_key') or
@@ -44,7 +40,6 @@ def check_api_key(f):
                 logging.error(f"Invalid API key: {api_key}")
                 return {'description': 'Invalid API key'}, 401
 
-            # Передаём username в метод
             kwargs['username'] = user.username
             return f(*args, **kwargs)
 

@@ -3,11 +3,11 @@ from data import db_session
 from data.user import User
 from data.admin import Admin
 from flask_login import current_user, login_user, logout_user
-from flask import render_template, redirect, request, jsonify
-from forms.admin_login import LoginForm
-from forms.admin_students import CreateStudentForm, EditStudentForm
-from forms.admin_teachers import CreateTeacherForm, EditTeacherForm
-from forms.admin_schedules import CreateScheduleForm, EditScheduleForm
+from flask import render_template, redirect, request, url_for, flash, Response
+from forms.login import LoginForm
+from forms.admin_students import CreateStudentForm, EditStudentForm, StudentSearchForm
+from forms.admin_teachers import CreateTeacherForm, EditTeacherForm, TeacherSearchForm
+from forms.admin_schedules import CreateScheduleForm, EditScheduleForm, ScheduleSearchForm
 from forms.admin_subjects import CreateSubjectForm, EditSubjectForm
 from forms.user_settings import UserSettingsForm
 from api.admin.admin_students_api import AdminOneStudentAPI, AdminAllStudentsAPI
@@ -17,672 +17,688 @@ from api.admin.admin_subjects_api import AdminSubjectApi, AdminSubjectsApi
 from api.admin.admin_excel_files import (AdminStudentsExcelFile, AdminTeachersExcelFile, AdminScheduleExcelFile,
                                          AdminSubjectsExcelFile)
 from api.user_settings_api import UserSettingsAPI
-from sqlalchemy.orm import joinedload
-from data.student import Student
-from data.classes import Class
-from data.teacher import Teacher
-from data.teacher_position import TeacherPosition
-from data.subject import Subject
-from data.schedule import Schedule
 from decorators.login_decorator import blueprint_login_required
 import base64
+import logging
+from datetime import datetime
+
+
+logging.basicConfig(
+    filename='routes.log',
+    level=logging.DEBUG,
+    format='%(asctime)s [%(levelname)s] - %(message)s'
+)
 
 
 @admin_bp.route('/')
 def index():
+    """Базовая страница Администратора"""
     return render_template('admin/index.html')
 
 
-@admin_bp.route('/students')
+@admin_bp.route('/students', defaults={'search_query': ''}, methods=['GET', 'POST'])
+@admin_bp.route('/students/<string:search_query>', methods=['GET', 'POST'])
 @blueprint_login_required('admin_bp')
-def students():
+def students(search_query=''):
+    """Страница со списком студентов"""
+    form = StudentSearchForm()
+
+    if form.validate_on_submit():
+        search_query = form.search.data.strip()
+        return redirect(url_for('admin.students', search_query=search_query))
+
+    if request.method == 'GET' and not search_query and 'search' in request.args:
+        search_query = request.args.get('search', '').strip()
+        if search_query:
+            return redirect(url_for('admin.students', search_query=search_query))
+
+    if search_query:
+        form.search.data = search_query
+
     api = AdminAllStudentsAPI()
-    response, status = api.get()
-    return render_template('admin/students_list.html', students=response['students'], message=response['message'])
+    response = api.get(search=search_query)
+
+    if isinstance(response, tuple):
+        students, status = response
+        students = students.get('students', []) if isinstance(students, dict) else []
+    else:
+        flash('Ошибка при получении списка учеников.', 'danger')
+        students = []
+
+    return render_template(
+        'admin/students_list.html',
+        form=form,
+        students=students,
+        search_query=search_query
+    )
 
 
-@admin_bp.route('/students/excel')
+@admin_bp.route('/students/excel', defaults={'search_query': ''}, methods=['GET'])
+@admin_bp.route('/students/excel/<string:search_query>', methods=['GET'])
 @blueprint_login_required('admin_bp')
-def students_excel():
-    api = AdminStudentsExcelFile()
-    return api.get()
+def students_excel(search_query=''):
+    """Скачивание Excel файла со списком всех студентов"""
+    if not search_query and 'search' in request.args:
+        search_query = request.args.get('search', '').strip()
+        logging.info(f"Retrieved search_query from query string: '{search_query}'")
+    else:
+        logging.info(f"Using search_query from path: '{search_query}'")
 
-
-@admin_bp.route('/student/<int:student_id>', methods=['GET', 'POST'])
-@blueprint_login_required('admin_bp')
-def edit_student(student_id):
-    db_sess = db_session.create_session()
-    try:
-        # Получаем данные ученика
-        student = (db_sess.query(Student)
-                   .options(joinedload(Student.user))
-                   .options(joinedload(Student.class_))
-                   .filter(Student.student_id == student_id)
-                   .first())
-
-        if not student:
-            return "Ученик не найден", 404
-
-        # Получаем список всех классов
-        classes = db_sess.query(Class).all()
-        class_choices = [(cls.class_id, cls.class_name) for cls in classes]
-
-        # Создаем форму
-        form = EditStudentForm()
-        form.class_id.choices = class_choices
-
-        if form.validate_on_submit():
-            # Формируем словарь с данными для передачи в patch
-            update_data = {
-                'username': form.username.data,
-                'password': form.password.data if form.password.data else None,
-                'first_name': form.first_name.data,
-                'last_name': form.last_name.data,
-                'email': form.email.data,
-                'phone_number': form.phone_number.data,
-                'class_id': form.class_id.data,
-                'birth_date': form.birth_date.data.strftime('%Y-%m-%d'),
-                'address': form.address.data,
-            }
-
-            # Обработка фото, если загружено
-            if form.profile_picture.data:
-                file = form.profile_picture.data
-                image_data = base64.b64encode(file.read()).decode('utf-8')
-                update_data['profile_picture'] = image_data
-
-            # Создаем экземпляр API-класса
-            api = AdminOneStudentAPI()
-
-            # Вызываем метод patch напрямую, передавая update_data
-            try:
-                response, status_code = api.patch(student_id, update_data=update_data)
-                if status_code == 200:
-                    return redirect('/admin/students')  # Перенаправление вместо JSON
-                else:
-                    return render_template('admin/edit_student.html', student=student, form=form,
-                                         message=response.get('description', 'Ошибка при обновлении'))
-            except Exception as e:
-                return render_template('admin/edit_student.html', student=student, form=form,
-                                     message=str(e))
-
-        # Заполняем форму текущими данными ученика для GET-запроса
-        if request.method == 'GET':
-            form.username.data = student.user.username
-            form.first_name.data = student.user.first_name
-            form.last_name.data = student.user.last_name
-            form.email.data = student.user.email
-            form.phone_number.data = student.user.phone_number
-            form.class_id.data = student.class_.class_id
-            form.birth_date.data = student.birth_date
-            form.address.data = student.address
-
-        return render_template('admin/edit_student.html', student=student, form=form)
-
-    finally:
-        db_sess.close()
+    logging.info(f"Exporting students to Excel with search_query: '{search_query}' (raw: {repr(search_query)})")
+    excel_resource = AdminStudentsExcelFile()
+    response = excel_resource.get(search_query=search_query)
+    logging.info(f"Excel response generated for search_query: '{search_query}'")
+    return response
 
 
 @admin_bp.route('/student/new', methods=['GET', 'POST'])
 @blueprint_login_required('admin_bp')
 def new_student():
-    db_sess = db_session.create_session()
-    try:
-        classes = db_sess.query(Class).all()
-        class_choices = [(cls.class_id, cls.class_name) for cls in classes]
-
-        form = CreateStudentForm()
-        form.class_id.choices = class_choices
-
-        if form.validate_on_submit():
-            # Формируем данные для API
-            data = {
-                'username': form.username.data,
-                'password': form.password.data,
-                'first_name': form.first_name.data,
-                'last_name': form.last_name.data,
-                'email': form.email.data,
-                'phone_number': form.phone_number.data,
-                'class_id': form.class_id.data,
-                'birth_date': form.birth_date.data.strftime('%Y-%m-%d'),
-                'address': form.address.data,
-            }
-
-            # Обработка фото, если загружено
-            if form.profile_picture.data:
-                file = form.profile_picture.data
-                image_data = base64.b64encode(file.read()).decode('utf-8')
-                data['profile_picture'] = image_data
-
-            # Создаем экземпляр API-класса
-            api = AdminOneStudentAPI()
-
-            # Вызываем метод post напрямую
-            try:
-                response, status_code = api.post(update_data=data)
-                print(f"API response: {response}, Status: {status_code}")
-                if status_code == 201:
-                    return redirect('/admin/students')
-                else:
-                    return render_template('admin/new_student.html', form=form, message=response.get('description', 'Ошибка при создании'))
-            except Exception as e:
-                return render_template('admin/new_student.html', form=form, message=str(e))
-
-        return render_template('admin/new_student.html', form=form)
-
-    finally:
-        db_sess.close()
-
-
-@admin_bp.route('/student/<int:student_id>/delete', methods=['POST'])
-@blueprint_login_required('admin_bp')
-def delete_student(student_id):
-    db_sess = db_session.create_session()
-    try:
-        # Проверяем, существует ли ученик
-        student = db_sess.query(Student).filter(Student.student_id == student_id).first()
-        if not student:
-            return jsonify({'message': 'Ученик не найден.'}), 404
-
-        # Вызываем метод delete из AdminOneStudentAPI
+    """Страница для создания нового студента"""
+    form = CreateStudentForm()
+    if form.validate_on_submit():
         api = AdminOneStudentAPI()
-        response, status = api.delete(student_id)
-        if status == 200:
-            response['redirect'] = '/admin/students'  # Добавляем redirect в JSON
-        return jsonify(response), status
-
-    finally:
-        db_sess.close()
-
-
-@admin_bp.route('/teachers')
-@blueprint_login_required('admin_bp')
-def teachers():
-    api = AdminAllTeachersAPI()
-    response, status = api.get()
-    return render_template('admin/teachers_list.html', teachers=response['teachers'], message=response['message'])
-
-
-@admin_bp.route('/teachers/excel')
-@blueprint_login_required('admin_bp')
-def teachers_excel():
-    api = AdminTeachersExcelFile()
-    return api.get()
-
-
-@admin_bp.route('/teacher/<int:teacher_id>', methods=['GET', 'POST'])
-@blueprint_login_required('admin_bp')
-def edit_teacher(teacher_id):
-    db_sess = db_session.create_session()
-    try:
-        # Получаем данные учителя
-        teacher = (db_sess.query(Teacher)
-                   .options(joinedload(Teacher.user))
-                   .options(joinedload(Teacher.classes))
-                   .options(joinedload(Teacher.positions))
-                   .filter(Teacher.teacher_id == teacher_id)
-                   .first())
-
-        if not teacher:
-            return "Учитель не найден", 404
-
-        # Получаем списки для выпадающих меню
-        classes = db_sess.query(Class).all()
-        positions = db_sess.query(TeacherPosition).all()
-        subjects = db_sess.query(Subject).all()
-
-        class_choices = [(0, 'Без класса')] + [(cls.class_id, cls.class_name) for cls in classes]
-        position_choices = [(pos.position_id, pos.position_name) for pos in positions]
-        subject_choices = [(0, 'Без предмета')] + [(sub.subject_id, sub.subject_name) for sub in subjects]
-
-        # Создаем форму
-        form = EditTeacherForm()
-        form.class_id.choices = class_choices
-        form.position_id.choices = position_choices
-        form.subject_id.choices = subject_choices
-
-        if form.validate_on_submit():
-            # Формируем словарь с данными для передачи в patch
-            update_data = {
-                'username': form.username.data,
-                'password': form.password.data if form.password.data else None,
-                'first_name': form.first_name.data,
-                'last_name': form.last_name.data,
-                'email': form.email.data,
-                'phone_number': form.phone_number.data,
-                'position_id': form.position_id.data,
-                'class_id': form.class_id.data if form.class_id.data != 0 else None,
-                'subject_id': form.subject_id.data if form.subject_id.data != 0 else None,
-            }
-
-            # Обработка фото, если загружено
-            if form.profile_picture.data:
-                file = form.profile_picture.data
-                image_data = base64.b64encode(file.read()).decode('utf-8')
-                update_data['profile_picture'] = image_data
-
-            # Создаем экземпляр API-класса
-            api = AdminOneTeacherAPI()
-
-            # Вызываем метод patch напрямую, передавая update_data
-            response, status_code = api.patch(teacher_id, update_data=update_data)
-            if status_code == 200:
-                return redirect('/admin/teachers')  # Перенаправляем вместо JSON
+        data = {
+            'username': form.username.data,
+            'password': form.password.data,
+            'first_name': form.first_name.data,
+            'last_name': form.last_name.data,
+            'email': form.email.data,
+            'phone_number': form.phone_number.data,
+            'class_id': form.class_id.data,
+            'birth_date': form.birth_date.data.strftime('%Y-%m-%d'),
+            'address': form.address.data,
+            'profile_picture': base64.b64encode(form.profile_picture.data.read()).decode('utf-8') if
+            form.profile_picture.data else None
+        }
+        response = api.post(update_data=data)
+        if isinstance(response, tuple):
+            result, status = response
+            if status == 201:
+                logging.info(f"Student created via API by admin")
+                flash('Ученик успешно создан.', 'success')
+                return redirect(url_for('admin.students'))
             else:
-                return render_template('admin/edit_teacher.html', teacher=teacher, form=form,
-                                     message=response.get('description', 'Ошибка при обновлении'))
+                flash(result.get('description', 'Ошибка при создании ученика.'), 'danger')
+        else:
+            flash('Ошибка при создании ученика.', 'danger')
+    return render_template('admin/new_student.html', form=form)
 
-        # Заполняем форму текущими данными учителя для GET-запроса
-        if request.method == 'GET':
-            form.username.data = teacher.user.username
-            form.first_name.data = teacher.user.first_name
-            form.last_name.data = teacher.user.last_name
-            form.email.data = teacher.user.email
-            form.phone_number.data = teacher.user.phone_number
-            form.position_id.data = teacher.positions[0].position_id if teacher.positions else position_choices[0][0]
-            form.class_id.data = teacher.positions[0].class_id if teacher.positions and teacher.positions[0].class_id else 0
-            form.subject_id.data = teacher.positions[0].subject_id if teacher.positions and teacher.positions[0].subject_id else 0
 
-        return render_template('admin/edit_teacher.html', teacher=teacher, form=form)
+@admin_bp.route('/student/<int:student_id>', methods=['GET', 'POST'])
+@blueprint_login_required('admin_bp')
+def edit_student(student_id):
+    """Страница для редактирования информации о студенте"""
+    api = AdminOneStudentAPI()
+    response = api.get(student_id=student_id)
+    logging.info(f"edit_student: Response for student_id={student_id}: {response}")
 
-    finally:
-        db_sess.close()
+    if isinstance(response, tuple):
+        student_data, status = response
+        if status == 200:
+            student = student_data.get('Student', {})
+            if not student:
+                logging.warning(f"edit_student: Empty student data for student_id={student_id}")
+                flash('Данные студента пусты.', 'danger')
+                return redirect(url_for('admin.students'))
+        else:
+            logging.error(f"edit_student: API error for student_id={student_id}, status={status}, response={student_data}")
+            flash(student_data.get('description', 'Ошибка при получении данных студента.'), 'danger')
+            return redirect(url_for('admin.students'))
+    else:
+        logging.error(f"edit_student: Invalid response for student_id={student_id}: {response}")
+        flash('Ошибка при получении данных студента.', 'danger')
+        return redirect(url_for('admin.students'))
+
+    if 'birth_date' in student and student['birth_date']:
+        try:
+            student['birth_date'] = datetime.strptime(student['birth_date'], '%Y-%m-%d').date()
+        except ValueError as e:
+            logging.error(f"edit_student: Invalid birth_date format for student_id={student_id}: {student['birth_date']}, error: {e}")
+            flash('Ошибка: некорректный формат даты рождения.', 'danger')
+            return redirect(url_for('admin.students'))
+
+    logging.info(f"edit_student: Student data for student_id={student_id}: {student}")
+
+    form = EditStudentForm(data=student)
+    if form.validate_on_submit():
+        data = {
+            'username': form.username.data,
+            'password': form.password.data or None,
+            'first_name': form.first_name.data,
+            'last_name': form.last_name.data,
+            'email': form.email.data,
+            'phone_number': form.phone_number.data,
+            'class_id': form.class_id.data,
+            'birth_date': form.birth_date.data.strftime('%Y-%m-%d'),
+            'address': form.address.data,
+            'profile_picture': base64.b64encode(form.profile_picture.data.read()).decode('utf-8') if form.profile_picture.data else None
+        }
+        response = api.patch(student_id, update_data=data)
+        if isinstance(response, tuple):
+            result, status = response
+            if status == 200:
+                logging.info(f"Student {student_id} updated via API by admin")
+                flash('Данные ученика обновлены.', 'success')
+                return redirect(url_for('admin.students'))
+            else:
+                flash(result.get('description', 'Ошибка при обновлении ученика.'), 'danger')
+        else:
+            flash('Ошибка при обновлении ученика.', 'danger')
+
+    return render_template('admin/edit_student.html', form=form, student=student)
+
+
+@admin_bp.route('/confirm_delete/student/<int:student_id>', methods=['GET', 'POST'])
+@blueprint_login_required('admin_bp')
+def confirm_delete_student(student_id):
+    """Страница для подтверждения удаления студента"""
+    if request.method == 'POST':
+        api = AdminOneStudentAPI()
+        response = api.delete(student_id)
+        if isinstance(response, tuple):
+            result, status = response
+            if status == 200:
+                logging.info(f"Student {student_id} deleted via API by admin")
+                flash('Ученик удален.', 'success')
+            else:
+                flash(result.get('description', 'Ошибка при удалении ученика.'), 'danger')
+        else:
+            flash('Ошибка при удалении ученика.', 'danger')
+        return redirect(url_for('admin.students'))
+    return render_template('admin/confirm_delete.html', entity='Ученик', id=student_id,
+                           delete_url=url_for('admin.confirm_delete_student', student_id=student_id),
+                           list_url=url_for('admin.students'))
+
+
+@admin_bp.route('/teachers', defaults={'search_query': ''}, methods=['GET', 'POST'])
+@admin_bp.route('/teachers/<string:search_query>', methods=['GET', 'POST'])
+@blueprint_login_required('admin_bp')
+def teachers(search_query=''):
+    """Страница для просмотра списка учителей"""
+    form = TeacherSearchForm()
+
+    if form.validate_on_submit():
+        search_query = form.search.data.strip()
+        return redirect(url_for('admin.teachers', search_query=search_query))
+
+    if request.method == 'GET' and not search_query and 'search' in request.args:
+        search_query = request.args.get('search', '').strip()
+        if search_query:
+            return redirect(url_for('admin.teachers', search_query=search_query))
+
+    if search_query:
+        form.search.data = search_query
+
+    api = AdminAllTeachersAPI()
+    response = api.get(search=search_query)
+
+    if isinstance(response, tuple):
+        teachers, status = response
+        teachers = teachers.get('teachers', []) if isinstance(teachers, dict) else []
+    else:
+        flash('Ошибка при получении списка учителей.', 'danger')
+        teachers = []
+
+    if not teachers:
+        logging.info(f"No teachers found for search_query: '{search_query}'")
+
+    return render_template(
+        'admin/teachers_list.html',
+        form=form,
+        teachers=teachers,
+        search_query=search_query
+    )
 
 
 @admin_bp.route('/teacher/new', methods=['GET', 'POST'])
 @blueprint_login_required('admin_bp')
 def new_teacher():
-    db_sess = db_session.create_session()
-    try:
-        classes = db_sess.query(Class).all()
-        positions = db_sess.query(TeacherPosition).all()
-        subjects = db_sess.query(Subject).all()
-
-        class_choices = [(0, 'Без класса')] + [(cls.class_id, cls.class_name) for cls in classes]
-        position_choices = [(pos.position_id, pos.position_name) for pos in positions]
-        subject_choices = [(0, 'Без предмета')] + [(sub.subject_id, sub.subject_name) for sub in subjects]
-
-        form = CreateTeacherForm()
-        form.class_id.choices = class_choices
-        form.position_id.choices = position_choices
-        form.subject_id.choices = subject_choices
-
-        if form.validate_on_submit():
-            # Формируем данные для API
-            data = {
-                'username': form.username.data,
-                'password': form.password.data,
-                'first_name': form.first_name.data,
-                'last_name': form.last_name.data,
-                'email': form.email.data,
-                'phone_number': form.phone_number.data,
-                'position_id': form.position_id.data,
-                'class_id': form.class_id.data if form.class_id.data != 0 else None,
-                'subject_id': form.subject_id.data if form.subject_id.data != 0 else None,
-            }
-
-            # Обработка фото, если загружено
-            if form.profile_picture.data:
-                file = form.profile_picture.data
-                image_data = base64.b64encode(file.read()).decode('utf-8')
-                data['profile_picture'] = image_data
-
-            # Создаем экземпляр API-класса
-            api = AdminOneTeacherAPI()
-
-            # Вызываем метод post напрямую
-            try:
-                response, status_code = api.post(update_data=data)
-                if status_code == 201:
-                    return redirect('/admin/teachers')
-                else:
-                    return render_template('admin/new_teacher.html', form=form, message=response.get('description', 'Ошибка при создании'))
-            except Exception as e:
-                return render_template('admin/new_teacher.html', form=form, message=str(e))
-
-        return render_template('admin/new_teacher.html', form=form)
-
-    finally:
-        db_sess.close()
-
-
-@admin_bp.route('/teacher/<int:teacher_id>/delete', methods=['POST'])
-@blueprint_login_required('admin_bp')
-def delete_teacher(teacher_id):
-    db_sess = db_session.create_session()
-    try:
-        # Проверяем, существует ли учитель
-        teacher = db_sess.query(Teacher).filter(Teacher.teacher_id == teacher_id).first()
-        if not teacher:
-            return jsonify({'message': 'Учитель не найден.'}), 404
-
-        # Вызываем метод delete из AdminOneTeacherAPI
+    """Страница создания нового учителя"""
+    form = CreateTeacherForm()
+    if form.validate_on_submit():
         api = AdminOneTeacherAPI()
-        response, status = api.delete(teacher_id)
+        try:
+            profile_picture = base64.b64encode(form.profile_picture.data.read()).decode('utf-8') if form.profile_picture.data else None
+        except Exception as e:
+            logging.error(f"Error encoding profile picture: {str(e)}")
+            flash('Ошибка при загрузке фото профиля.', 'danger')
+            return render_template('admin/new_teacher.html', form=form)
+
+        subject_ids = [sid for sid in form.subject_ids.data if sid != 0]
+
+        data = {
+            'username': form.username.data,
+            'password': form.password.data,
+            'first_name': form.first_name.data,
+            'last_name': form.last_name.data,
+            'email': form.email.data,
+            'phone_number': form.phone_number.data,
+            'position_id': form.position_id.data,
+            'class_id': form.class_id.data if form.class_id.data else None,
+            'subject_ids': subject_ids,
+            'profile_picture': profile_picture
+        }
+        logging.info(f"Creating new teacher with data: {data}")
+        response = api.post(update_data=data)
+        if isinstance(response, tuple):
+            result, status = response
+            if status == 201:
+                logging.info(f"Teacher created via API by admin")
+                flash('Учитель успешно создан.', 'success')
+                return redirect(url_for('admin.teachers'))
+            else:
+                flash(result.get('description', 'Ошибка при создании учителя.'), 'danger')
+        else:
+            flash('Ошибка при создании учителя.', 'danger')
+    return render_template('admin/new_teacher.html', form=form)
+
+
+@admin_bp.route('/teacher/<int:teacher_id>', methods=['GET', 'POST'])
+@blueprint_login_required('admin_bp')
+def edit_teacher(teacher_id):
+    """Страница изменения информации об учителе"""
+    api = AdminOneTeacherAPI()
+    response = api.get(teacher_id=teacher_id)
+    logging.info(f"edit_teacher: Response for teacher_id={teacher_id}: {response}")
+
+    if isinstance(response, tuple):
+        teacher_data, status = response
         if status == 200:
-            response['redirect'] = '/admin/teachers'  # Добавляем redirect
-        return jsonify(response), status
+            teacher = teacher_data.get('Teacher', {})
+            if not teacher:
+                logging.warning(f"edit_teacher: Empty teacher data for teacher_id={teacher_id}")
+                flash('Данные учителя пусты.', 'danger')
+                return redirect(url_for('admin.teachers'))
+        else:
+            logging.error(f"edit_teacher: API error for teacher_id={teacher_id}, status={status}, response={teacher_data}")
+            flash(teacher_data.get('description', 'Ошибка при получении данных учителя.'), 'danger')
+            return redirect(url_for('admin.teachers'))
+    else:
+        logging.error(f"edit_teacher: Invalid response for teacher_id={teacher_id}: {response}")
+        flash('Ошибка при получении данных учителя.', 'danger')
+        return redirect(url_for('admin.teachers'))
 
-    finally:
-        db_sess.close()
+    logging.info(f"edit_teacher: Teacher data for teacher_id={teacher_id}: {teacher}")
+
+    current_subject_ids = []
+    current_position_id = None
+    for position in teacher.get('positions', []):
+        current_position_id = position.get('position_id')
+        for subject in position.get('subjects', []):
+            subject_id = subject.get('subject_id')
+            if subject_id and subject_id not in current_subject_ids:
+                current_subject_ids.append(subject_id)
+
+    form_data = {
+        'username': teacher.get('username'),
+        'first_name': teacher.get('first_name'),
+        'last_name': teacher.get('last_name'),
+        'email': teacher.get('email'),
+        'phone_number': teacher.get('phone_number'),
+        'position_id': current_position_id,
+        'class_id': teacher.get('classes', [{}])[0].get('class_id') if teacher.get('classes') else None,
+        'subject_ids': current_subject_ids
+    }
+
+    form = EditTeacherForm(data=form_data)
+    form.subject_ids.data = current_subject_ids
+
+    if form.validate_on_submit():
+        try:
+            profile_picture = base64.b64encode(form.profile_picture.data.read()).decode('utf-8') if form.profile_picture.data else None
+        except Exception as e:
+            logging.error(f"Error encoding profile picture: {str(e)}")
+            flash('Ошибка при загрузке фото профиля.', 'danger')
+            return render_template('admin/edit_teacher.html', form=form, teacher=teacher)
+
+        subject_ids = [sid for sid in form.subject_ids.data if sid != 0]
+
+        data = {
+            'username': form.username.data,
+            'password': form.password.data or None,
+            'first_name': form.first_name.data,
+            'last_name': form.last_name.data,
+            'email': form.email.data,
+            'phone_number': form.phone_number.data,
+            'position_id': form.position_id.data,
+            'class_id': form.class_id.data if form.class_id.data else None,
+            'subject_ids': subject_ids,
+            'profile_picture': profile_picture
+        }
+        logging.info(f"Updating teacher {teacher_id} with data: {data}")
+        response = api.patch(teacher_id, update_data=data)
+        if isinstance(response, tuple):
+            result, status = response
+            if status == 200:
+                logging.info(f"Teacher {teacher_id} updated via API by admin")
+                flash('Данные учителя обновлены.', 'success')
+                return redirect(url_for('admin.teachers'))
+            else:
+                flash(result.get('description', 'Ошибка при обновлении учителя.'), 'danger')
+        else:
+            flash('Ошибка при обновлении учителя.', 'danger')
+
+    return render_template('admin/edit_teacher.html', form=form, teacher=teacher)
 
 
-@admin_bp.route('/schedules', methods=['GET'])
+@admin_bp.route('/confirm_delete/teacher/<int:teacher_id>', methods=['GET', 'POST'])
+@blueprint_login_required('admin_bp')
+def confirm_delete_teacher(teacher_id):
+    """Страница для подтверждения удаления учителя"""
+    if request.method == 'POST':
+        api = AdminOneTeacherAPI()
+        response = api.delete(teacher_id)
+        logging.info(f"Delete teacher {teacher_id}: Response={response}")
+        if isinstance(response, tuple):
+            result, status = response
+            if status == 200:
+                logging.info(f"Teacher {teacher_id} deleted via API by admin")
+                flash('Учитель удален.', 'success')
+            else:
+                flash(result.get('description', 'Ошибка при удалении учителя.'), 'danger')
+        else:
+            flash('Ошибка при удалении учителя.', 'danger')
+        return redirect(url_for('admin.teachers'))
+    return render_template('admin/confirm_delete.html', entity='Учитель', id=teacher_id,
+                           delete_url=url_for('admin.confirm_delete_teacher', teacher_id=teacher_id),
+                           list_url=url_for('admin.teachers'))
+
+
+@admin_bp.route('/teachers/excel', defaults={'search_query': ''}, methods=['GET'])
+@admin_bp.route('/teachers/excel/<string:search_query>', methods=['GET'])
+@blueprint_login_required('admin_bp')
+def teachers_excel(search_query=''):
+    """Скачивание списка учителей в Excel"""
+    if not search_query and 'search' in request.args:
+        search_query = request.args.get('search', '').strip()
+        logging.info(f"Retrieved search_query from query string: '{search_query}'")
+    else:
+        logging.info(f"Using search_query from path: '{search_query}'")
+
+    logging.info(f"Exporting teachers to Excel with search_query: '{search_query}' (raw: {repr(search_query)})")
+    excel_resource = AdminTeachersExcelFile()
+    response = excel_resource.get(search_query=search_query)
+    logging.info(f"Excel response generated for search_query: '{search_query}'")
+
+    if not isinstance(response, Response):
+        logging.error(f"Unexpected response from AdminTeachersExcelFile: {response}")
+        flash('Ошибка при экспорте в Excel.', 'danger')
+        return redirect(url_for('admin.teachers'))
+    return response
+
+
+@admin_bp.route('/schedules', methods=['GET', 'POST'])
 @blueprint_login_required('admin_bp')
 def schedules():
-    # Получаем параметры фильтрации из запроса
-    teacher_filter = request.args.get('teacher', '').strip()
-    class_filter = request.args.get('class', '').strip()
-    time_filter = request.args.get('time', '').strip()
-    day_filter = request.args.get('day', '').strip()
+    """Страница просмотра списка расписания"""
+    form = ScheduleSearchForm()
+    filters = {}
+
+    if request.method == 'POST' and form.validate_on_submit():
+        if form.teacher.data:
+            filters['teacher'] = form.teacher.data.strip()
+        if form.class_name.data:
+            filters['class'] = form.class_name.data.strip()
+        if form.subject.data:
+            filters['subject'] = form.subject.data.strip()
+        if form.time.data:
+            filters['time'] = form.time.data.strip()
+        if form.day.data:
+            filters['day'] = form.day.data.strip()
+        logging.debug(f"POST filters applied: {filters}")
+        query_string = '&'.join(f"{key}={value}" for key, value in filters.items())
+        return redirect(url_for('admin.schedules') + (f"?{query_string}" if query_string else ""))
+
+    if request.args:
+        filters = {
+            'teacher': request.args.get('teacher', '').strip(),
+            'class': request.args.get('class_name', '').strip(),
+            'subject': request.args.get('subject', '').strip(),
+            'time': request.args.get('time', '').strip(),
+            'day': request.args.get('day', '').strip()
+        }
+        form.teacher.data = filters['teacher']
+        form.class_name.data = filters['class']
+        form.subject.data = filters['subject']
+        form.time.data = filters['time']
+        form.day.data = filters['day']
+        logging.debug(f"GET filters applied: {filters}")
 
     api = AdminAllSchedulesAPI()
-    response, status = api.get()
-
-    if status != 200:
-        return render_template('admin/schedules_list.html', schedules=[], message=response.get('description', 'Ошибка при получении расписания'))
-
-    schedules = response['schedules']
-
-    # Применяем фильтры
-    filtered_schedules = schedules
-
-    # Фильтр по учителю (поиск по объединённой строке "Имя Фамилия")
-    if teacher_filter:
-        filtered_schedules = [
-            s for s in filtered_schedules
-            if teacher_filter.lower() in f"{s['teacher']['first_name'] or ''} {s['teacher']['last_name'] or ''}".lower()
-        ]
-
-    # Фильтр по классу (поиск по названию класса)
-    if class_filter:
-        filtered_schedules = [
-            s for s in filtered_schedules
-            if class_filter.lower() in (s['class']['class_name'] or '').lower()
-        ]
-
-    # Фильтр по времени (поиск по времени начала)
-    if time_filter:
-        filtered_schedules = [
-            s for s in filtered_schedules
-            if time_filter.lower() in (s['start_time'] or '').lower()
-        ]
-
-    # Фильтр по дню недели
-    if day_filter:
-        filtered_schedules = [
-            s for s in filtered_schedules
-            if day_filter.lower() in (s['day_of_week'] or '').lower()
-        ]
-
-    # Формируем сообщение
-    if not filtered_schedules:
-        message = 'Нет записей, соответствующих критериям поиска.'
+    response = api.get(**filters)
+    if isinstance(response, tuple):
+        result, status = response
+        if status == 200:
+            schedules = result.get('schedules', []) if isinstance(result, dict) else []
+            logging.debug(f"Schedules retrieved: {len(schedules)} items")
+        else:
+            error_message = result.get('description', 'Неизвестная ошибка') if isinstance(result, dict) else 'Неизвестная ошибка'
+            flash(f'Ошибка при получении списка расписания: {error_message}', 'danger')
+            logging.error(f"API error: {error_message}")
+            schedules = []
     else:
-        message = f'Найдено {len(filtered_schedules)} записей расписания.'
+        flash('Ошибка при получении списка расписания: Неверный формат ответа API.', 'danger')
+        logging.error(f"Invalid API response format: {response}")
+        schedules = []
 
-    return render_template('admin/schedules_list.html', schedules=filtered_schedules, message=message,
-                         teacher_filter=teacher_filter, class_filter=class_filter,
-                         time_filter=time_filter, day_filter=day_filter)
-
-
-@admin_bp.route('/schedules/excel', methods=['GET'])
-@blueprint_login_required('admin_bp')
-def excel_schedules():
-    api = AdminScheduleExcelFile()
-    return api.get()
+    return render_template('admin/schedules_list.html', form=form, schedules=schedules)
 
 
 @admin_bp.route('/schedule/new', methods=['GET', 'POST'])
 @blueprint_login_required('admin_bp')
 def new_schedule():
-    db_sess = db_session.create_session()
-    try:
-        # Получаем данные для выпадающих списков
-        classes = db_sess.query(Class).all()
-        subjects = db_sess.query(Subject).all()
-        teachers = db_sess.query(Teacher).options(joinedload(Teacher.user)).all()
-
-        form = CreateScheduleForm()
-        form.class_id.choices = [(cls.class_id, cls.class_name) for cls in classes]
-        form.subject_id.choices = [(sub.subject_id, sub.subject_name) for sub in subjects]
-        form.teacher_id.choices = [(t.teacher_id, f"{t.user.first_name} {t.user.last_name}") for t in teachers]
-
-        if form.validate_on_submit():
-            # Формируем данные для API
-            data = {
-                'class_id': form.class_id.data,
-                'subject_id': form.subject_id.data,
-                'teacher_id': form.teacher_id.data,
-                'day_of_week': form.day_of_week.data,
-                'start_time': form.start_time.data,
-                'end_time': form.end_time.data
-            }
-
-            # Создаем экземпляр API-класса
-            api = AdminOneScheduleAPI()
-
-            # Вызываем метод post напрямую
-            response, status_code = api.post(update_data=data)
-            if status_code == 201:
-                return redirect('/admin/schedules')
+    """Страница для создания записи расписания"""
+    form = CreateScheduleForm()
+    if form.validate_on_submit():
+        api = AdminOneScheduleAPI()
+        data = {
+            'class_id': form.class_id.data,
+            'subject_id': form.subject_id.data,
+            'teacher_id': form.teacher_id.data,
+            'day_of_week': form.day_of_week.data,
+            'start_time': form.start_time.data,
+            'end_time': form.end_time.data
+        }
+        response = api.post(update_data=data)
+        if isinstance(response, tuple):
+            result, status = response
+            if status == 201:
+                logging.info(f"Schedule created via API by admin")
+                flash('Запись расписания создана.', 'success')
+                return redirect(url_for('admin.schedules'))
             else:
-                return render_template('admin/new_schedule.html', form=form, message=response.get('description', 'Ошибка при создании'))
-
-        return render_template('admin/new_schedule.html', form=form)
-
-    finally:
-        db_sess.close()
+                flash(result.get('description', 'Ошибка при создании записи расписания.'), 'danger')
+        else:
+            flash('Ошибка при создании записи расписания.', 'danger')
+    return render_template('admin/new_schedule.html', form=form)
 
 
 @admin_bp.route('/schedule/<int:schedule_id>', methods=['GET', 'POST'])
 @blueprint_login_required('admin_bp')
 def edit_schedule(schedule_id):
-    db_sess = db_session.create_session()
-    try:
-        # Получаем данные расписания
-        schedule = (db_sess.query(Schedule)
-                    .options(joinedload(Schedule.class_))
-                    .options(joinedload(Schedule.subject))
-                    .options(joinedload(Schedule.teacher).joinedload(Teacher.user))
-                    .filter(Schedule.schedule_id == schedule_id)
-                    .first())
+    """Страница для изменения записи расписания"""
+    api = AdminOneScheduleAPI()
+    response = api.get(schedule_id=schedule_id)
+    if isinstance(response, tuple):
+        schedule, status = response
+        schedule = schedule.get('schedule', {}) if isinstance(schedule, dict) else {}
+    else:
+        flash('Запись расписания не найдена.', 'danger')
+        return redirect(url_for('admin.schedules'))
 
-        if not schedule:
-            return "Запись расписания не найдена", 404
+    form_data = {
+        'class_id': schedule.get('class', {}).get('class_id'),
+        'subject_id': schedule.get('subject', {}).get('subject_id'),
+        'teacher_id': schedule.get('teacher', {}).get('teacher_id'),
+        'day_of_week': schedule.get('day_of_week'),
+        'start_time': schedule.get('start_time'),
+        'end_time': schedule.get('end_time')
+    }
 
-        # Получаем данные для выпадающих списков
-        classes = db_sess.query(Class).all()
-        subjects = db_sess.query(Subject).all()
-        teachers = db_sess.query(Teacher).options(joinedload(Teacher.user)).all()
-
-        # Создаем форму
-        form = EditScheduleForm()
-        form.class_id.choices = [(cls.class_id, cls.class_name) for cls in classes]
-        form.subject_id.choices = [(sub.subject_id, sub.subject_name) for sub in subjects]
-        form.teacher_id.choices = [(t.teacher_id, f"{t.user.first_name} {t.user.last_name}") for t in teachers]
-
-        if form.validate_on_submit():
-            # Формируем словарь с данными для передачи в patch
-            update_data = {
-                'class_id': form.class_id.data,
-                'subject_id': form.subject_id.data,
-                'teacher_id': form.teacher_id.data,
-                'day_of_week': form.day_of_week.data,
-                'start_time': form.start_time.data,
-                'end_time': form.end_time.data
-            }
-
-            # Создаем экземпляр API-класса
-            api = AdminOneScheduleAPI()
-
-            # Вызываем метод patch напрямую
-            response, status_code = api.patch(schedule_id, update_data=update_data)
-            if status_code == 200:
-                return redirect('/admin/schedules')
+    form = EditScheduleForm(data=form_data)
+    if form.validate_on_submit():
+        data = {
+            'class_id': form.class_id.data,
+            'subject_id': form.subject_id.data,
+            'teacher_id': form.teacher_id.data,
+            'day_of_week': form.day_of_week.data,
+            'start_time': form.start_time.data,
+            'end_time': form.end_time.data
+        }
+        response = api.patch(schedule_id, update_data=data)
+        if isinstance(response, tuple):
+            result, status = response
+            if status == 200:
+                logging.info(f"Schedule {schedule_id} updated via API by admin")
+                flash('Запись расписания обновлена.', 'success')
+                return redirect(url_for('admin.schedules'))
             else:
-                return render_template('admin/edit_schedule.html', schedule=schedule, form=form,
-                                     message=response.get('description', 'Ошибка при обновлении'))
-
-        # Заполняем форму текущими данными расписания для GET-запроса
-        if request.method == 'GET':
-            form.class_id.data = schedule.class_id
-            form.subject_id.data = schedule.subject_id
-            form.teacher_id.data = schedule.teacher_id
-            form.day_of_week.data = schedule.day_of_week
-            form.start_time.data = schedule.start_time
-            form.end_time.data = schedule.end_time
-
-        return render_template('admin/edit_schedule.html', schedule=schedule, form=form)
-
-    finally:
-        db_sess.close()
+                flash(result.get('description', 'Ошибка при обновлении записи расписания.'), 'danger')
+        else:
+            flash('Ошибка при обновлении записи расписания.', 'danger')
+    return render_template('admin/edit_schedule.html', form=form, schedule=schedule)
 
 
-@admin_bp.route('/schedule/<int:schedule_id>/delete', methods=['POST'])
+@admin_bp.route('/confirm_delete/schedule/<int:schedule_id>', methods=['GET', 'POST'])
 @blueprint_login_required('admin_bp')
-def delete_schedule(schedule_id):
-    db_sess = db_session.create_session()
-    try:
-        # Проверяем, существует ли запись
-        schedule = db_sess.query(Schedule).filter(Schedule.schedule_id == schedule_id).first()
-        if not schedule:
-            return jsonify({'message': 'Запись расписания не найдена.'}), 404
-
-        # Вызываем метод delete из AdminOneScheduleAPI
+def confirm_delete_schedule(schedule_id):
+    """Страница подтверждения удаления записи расписания"""
+    if request.method == 'POST':
         api = AdminOneScheduleAPI()
-        response, status = api.delete(schedule_id)
-        if status == 200:
-            response['redirect'] = '/admin/schedules'  # Добавляем redirect в JSON
-        return jsonify(response), status
+        response = api.delete(schedule_id)
+        if isinstance(response, tuple):
+            result, status = response
+            if status == 200:
+                logging.info(f"Schedule {schedule_id} deleted via API by admin")
+                flash('Запись расписания удалена.', 'success')
+            else:
+                flash(result.get('description', 'Ошибка при удалении записи расписания.'), 'danger')
+        else:
+            flash('Ошибка при удалении записи расписания.', 'danger')
+        return redirect(url_for('admin.schedules'))
+    return render_template('admin/confirm_delete.html', entity='Запись расписания', id=schedule_id,
+                           delete_url=url_for('admin.confirm_delete_schedule', schedule_id=schedule_id),
+                           list_url=url_for('admin.schedules'))
 
-    finally:
-        db_sess.close()
-
-
-# Новые маршруты для предметов
 
 @admin_bp.route('/subjects', methods=['GET'])
 @blueprint_login_required('admin_bp')
 def subjects():
-    """Отображение списка всех предметов."""
+    """Страница для просмотра списка предметов"""
     api = AdminSubjectsApi()
-    response, status = api.get()
-
-    if status != 200:
-        return render_template('admin/subjects_list.html', subjects=[], message=response.get('description', 'Ошибка при получении списка предметов'))
-
-    subjects = response['subjects']
-    message = response['message']
-    return render_template('admin/subjects_list.html', subjects=subjects, message=message)
-
-
-@admin_bp.route('/subjects/excel', methods=['GET'])
-@blueprint_login_required('admin_bp')
-def subjects_excel():
-    api = AdminSubjectsExcelFile()
-    return api.get()
+    response = api.get()
+    if isinstance(response, tuple):
+        subjects, status = response
+        subjects = subjects.get('subjects', []) if isinstance(subjects, dict) else []
+    else:
+        flash('Ошибка при получении списка предметов.', 'danger')
+        subjects = []
+    return render_template('admin/subjects_list.html', subjects=subjects)
 
 
 @admin_bp.route('/subject/new', methods=['GET', 'POST'])
 @blueprint_login_required('admin_bp')
 def new_subject():
-    """Создание нового предмета."""
+    """Страница для создания нового предмета"""
     form = CreateSubjectForm()
-
     if form.validate_on_submit():
-        # Формируем данные для API
-        data = {
-            'subject_name': form.subject_name.data
-        }
-
-        # Создаем экземпляр API-класса
         api = AdminSubjectApi()
-
-        # Вызываем метод post напрямую
-        response, status_code = api.post(subject_name=data['subject_name'])
-        if status_code == 201:
-            return redirect('/admin/subjects')
+        data = {'subject_name': form.subject_name.data}
+        response = api.post(subject_name=data)
+        if isinstance(response, tuple):
+            result, status = response
+            if status == 201:
+                logging.info(f"Subject created via API by admin")
+                flash('Предмет создан.', 'success')
+                return redirect(url_for('admin.subjects'))
+            else:
+                flash(result.get('description', 'Ошибка при создании предмета.'), 'danger')
         else:
-            return render_template('admin/new_subject.html', form=form, message=response.get('description', 'Ошибка при создании предмета'))
-
+            flash('Ошибка при создании предмета.', 'danger')
     return render_template('admin/new_subject.html', form=form)
 
 
 @admin_bp.route('/subject/<int:subject_id>', methods=['GET', 'POST'])
 @blueprint_login_required('admin_bp')
 def edit_subject(subject_id):
-    """Редактирование предмета."""
-    db_sess = db_session.create_session()
-    try:
-        # Получаем данные предмета
-        subject = db_sess.query(Subject).filter(Subject.subject_id == subject_id).first()
-        if not subject:
-            return "Предмет не найден", 404
+    """Страница для изменения названия предмета"""
+    api = AdminSubjectApi()
+    response = api.get(subject_id=subject_id)
+    if isinstance(response, tuple):
+        subject_data, status = response
+        subject = subject_data.get('Subject', {}) if isinstance(subject_data, dict) else {}
+    else:
+        flash('Предмет не найден.', 'danger')
+        return redirect(url_for('admin.subjects'))
 
-        form = EditSubjectForm()
-
-        if form.validate_on_submit():
-            # Формируем данные для API
-            update_data = {
-                'subject_name': form.subject_name.data
-            }
-
-            # Создаем экземпляр API-класса
-            api = AdminSubjectApi()
-
-            # Вызываем метод patch напрямую
-            response, status_code = api.patch(subject_id, update_data=update_data)
-            if status_code == 200:
-                return redirect('/admin/subjects')
+    form = EditSubjectForm(data=subject)
+    if form.validate_on_submit():
+        data = {'subject_name': form.subject_name.data}
+        response = api.patch(subject_id, update_data=data)
+        if isinstance(response, tuple):
+            result, status = response
+            if status == 200:
+                logging.info(f"Subject {subject_id} updated via API by admin")
+                flash('Предмет обновлен.', 'success')
+                return redirect(url_for('admin.subjects'))
             else:
-                return render_template('admin/edit_subject.html', subject=subject, form=form,
-                                     message=response.get('description', 'Ошибка при обновлении'))
-
-        # Заполняем форму текущими данными предмета для GET-запроса
-        if request.method == 'GET':
-            form.subject_name.data = subject.subject_name
-
-        return render_template('admin/edit_subject.html', subject=subject, form=form)
-
-    finally:
-        db_sess.close()
+                flash(result.get('description', 'Ошибка при обновлении предмета.'), 'danger')
+        else:
+            flash('Ошибка при обновлении предмета.', 'danger')
+    return render_template('admin/edit_subject.html', form=form, subject=subject)
 
 
-@admin_bp.route('/subject/<int:subject_id>/delete', methods=['POST'])
+@admin_bp.route('/confirm_delete/subject/<int:subject_id>', methods=['GET', 'POST'])
 @blueprint_login_required('admin_bp')
-def delete_subject(subject_id):
-    """Удаление предмета."""
-    db_sess = db_session.create_session()
-    try:
-        # Проверяем, существует ли предмет
-        subject = db_sess.query(Subject).filter(Subject.subject_id == subject_id).first()
-        if not subject:
-            return jsonify({'message': 'Предмет не найден.'}), 404
-
-        # Вызываем метод delete из AdminSubjectApi
+def confirm_delete_subject(subject_id):
+    """Подтверждение удаления предмета"""
+    if request.method == 'POST':
         api = AdminSubjectApi()
-        response, status = api.delete(subject_id)
-        if status == 200:
-            response['redirect'] = '/admin/subjects'  # Добавляем redirect в JSON
-        return jsonify(response), status
+        response = api.delete(subject_id)
+        if isinstance(response, tuple):
+            result, status = response
+            if status == 200:
+                logging.info(f"Subject {subject_id} deleted via API by admin")
+                flash('Предмет удален.', 'success')
+            else:
+                flash(result.get('description', 'Ошибка при удалении предмета.'), 'danger')
+        else:
+            flash('Ошибка при удалении предмета.', 'danger')
+        return redirect(url_for('admin.subjects'))
+    return render_template('admin/confirm_delete.html', entity='Предмет', id=subject_id,
+                           delete_url=url_for('admin.confirm_delete_subject', subject_id=subject_id),
+                           list_url=url_for('admin.subjects'))
 
-    finally:
-        db_sess.close()
+
+@admin_bp.route('/schedules/excel', methods=['GET'])
+@blueprint_login_required('admin_bp')
+def schedules_excel():
+    """Скачивание списка расписания в Excel"""
+    excel_resource = AdminScheduleExcelFile()
+    response = excel_resource.get()
+    return response
+
+
+@admin_bp.route('/subjects/excel', methods=['GET'])
+@blueprint_login_required('admin_bp')
+def subjects_excel():
+    """Скачивание списка предметов в Excel"""
+    excel_resource = AdminSubjectsExcelFile()
+    response = excel_resource.get()
+    return response
 
 
 @admin_bp.route('/settings', methods=['GET', 'POST'])
 @blueprint_login_required('admin_bp')
 def settings():
-    """Страница настроек администратора."""
+    """Страница настроек аккаунта администратора."""
     form = UserSettingsForm()
     api = UserSettingsAPI()
 
-    # Определяем username текущего пользователя
     username = current_user.username
 
     if form.validate_on_submit():
-        # Формируем данные для обновления
         update_data = {
             'first_name': form.first_name.data,
             'last_name': form.last_name.data,
@@ -690,29 +706,24 @@ def settings():
             'phone_number': form.phone_number.data,
         }
 
-        # Обработка фото, если загружено
         if form.profile_picture.data:
             file = form.profile_picture.data
             image_data = base64.b64encode(file.read()).decode('utf-8')
             update_data['profile_picture'] = image_data
 
-        # Обновление пароля, если указан
         if form.password.data:
             update_data['password'] = form.password.data
 
-        # Вызываем метод PATCH из API
         response, status_code = api.patch(current_user.user_id, username=username, update_data=update_data)
         if status_code == 200:
             return redirect('/admin/')
         else:
             return render_template('admin/settings.html', form=form, message=response.get('description', 'Ошибка при обновлении'))
 
-    # Для GET-запроса получаем данные профиля через API
     response, status_code = api.get(current_user.user_id, username=username)
     if status_code != 200:
         return render_template('admin/settings.html', form=form, message=response.get('description', 'Ошибка при получении данных профиля'))
 
-    # Заполняем форму данными из API
     user_data = response['user']
     form.first_name.data = user_data['first_name']
     form.last_name.data = user_data['last_name']
@@ -724,6 +735,7 @@ def settings():
 
 @admin_bp.route('/login', methods=['GET', 'POST'])
 def login():
+    """Страница регистрации администратора"""
     db_sess = db_session.create_session()
     try:
         if current_user.is_authenticated and db_sess.query(Admin).filter(Admin.user_id == current_user.user_id).first():
@@ -748,5 +760,6 @@ def login():
 @admin_bp.route('/logout')
 @blueprint_login_required('admin_bp')
 def logout():
+    """Выход из аккаунта администратора"""
     logout_user()
     return redirect('/admin/')

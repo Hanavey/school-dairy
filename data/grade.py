@@ -5,6 +5,7 @@ from .db_session import SqlAlchemyBase
 
 
 class Grade(SqlAlchemyBase, SerializerMixin):
+    """Таблица для оценок"""
     __tablename__ = 'grades'
 
     grade_id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, autoincrement=True)

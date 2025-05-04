@@ -15,20 +15,13 @@ logging.basicConfig(
 
 
 def admin_authorization_required(endpoint, method="GET"):
-    """
-    Декоратор для проверки авторизации администратора (через сессию или API-ключ).
-
-    :param endpoint: Путь API (например, '/api/admin/students' или '/api/admin/student/3050')
-    :param method: HTTP-метод (GET, POST, PATCH, DELETE и т.д.)
-    :return: Декорированный метод, если авторизация пройдена
-    """
+    """Декоратор для проверки авторизации администратора (через сессию или API-ключ)."""
     def decorator(f):
         @wraps(f)
         def wrapped_function(*args, **kwargs):
             client_ip = request.remote_addr
             full_endpoint = f"{method} {endpoint}"
 
-            # Проверка авторизации через сессию (Flask-Login)
             if hasattr(current_user, 'is_authenticated') and current_user.is_authenticated:
                 username = current_user.username
                 logging.info(f"{full_endpoint} - IP: {client_ip}, User: {username} (via session)")
@@ -45,11 +38,9 @@ def admin_authorization_required(endpoint, method="GET"):
                 finally:
                     db_sess.close()
 
-                # Передаем username в декорируемую функцию через kwargs
                 kwargs['username'] = username
                 return f(*args, **kwargs)
 
-            # Проверка авторизации через API-ключ
             api_key = request.headers.get('X-API-Key')
             if api_key:
                 db_sess = db_session.create_session()

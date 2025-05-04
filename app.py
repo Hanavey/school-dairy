@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, render_template
 from flask_restful import Api
 from flask_login import LoginManager
 from flask_migrate import Migrate
@@ -7,8 +7,6 @@ from data.user import User
 from student import student_bp
 from teacher import teacher_bp
 from admin import admin_bp
-from api.student_api import StudentScheduleAPI, StudentGradesAPI
-from api.teacher_api import TeacherScheduleAPI, TeacherGradesAPI
 from api.admin.admin_students_api import AdminOneStudentAPI, AdminAllStudentsAPI
 from api.admin.admin_teachers_api import AdminOneTeacherAPI, AdminAllTeachersAPI
 from api.admin.admin_schedules_api import AdminOneScheduleAPI, AdminAllSchedulesAPI
@@ -24,7 +22,6 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db/school_diary.db?check_same
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 
-# Инициализация базы данных
 db_session.global_init("db/school_diary.db")
 
 # Инициализация Flask-Migrate
@@ -34,7 +31,6 @@ migrate = Migrate(app, db_session.get_engine(), render_as_batch=True)  # render_
 # Инициализация Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = 'admin.login'
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -48,21 +44,17 @@ app.register_blueprint(admin_bp, url_prefix='/admin')
 
 # Инициализация Flask-RESTful API
 api = Api(app)
-api.add_resource(StudentScheduleAPI, '/api/student/schedule/<int:student_id>')
-api.add_resource(StudentGradesAPI, '/api/student/grades/<int:student_id>')
-api.add_resource(TeacherScheduleAPI, '/api/teacher/schedule/<int:teacher_id>')
-api.add_resource(TeacherGradesAPI, '/api/teacher/grades/<int:teacher_id>')
 api.add_resource(AdminOneStudentAPI, '/api/admin/student/<int:student_id>', '/api/admin/student')
-api.add_resource(AdminAllStudentsAPI, '/api/admin/students')
+api.add_resource(AdminAllStudentsAPI, '/api/admin/students/<string:search>', '/api/admin/students')
 api.add_resource(AdminOneTeacherAPI, '/api/admin/teacher/<int:teacher_id>', '/api/admin/teacher')
-api.add_resource(AdminAllTeachersAPI, '/api/admin/teachers')
+api.add_resource(AdminAllTeachersAPI, '/api/admin/teachers/<string:search>', '/api/admin/teachers')
 api.add_resource(AdminOneScheduleAPI, '/api/admin/schedule/<int:schedule_id>', '/api/admin/schedule')
 api.add_resource(AdminAllSchedulesAPI, '/api/admin/schedules')
 api.add_resource(AdminSubjectApi, '/api/admin/subject/<int:subject_id>', '/api/admin/subject')
 api.add_resource(AdminSubjectsApi, '/api/admin/subjects')
 api.add_resource(UserSettingsAPI, '/api/user/settings')
-api.add_resource(AdminStudentsExcelFile, '/api/admin/students/excel')
-api.add_resource(AdminTeachersExcelFile, '/api/admin/teachers/excel')
+api.add_resource(AdminStudentsExcelFile, '/api/admin/students/excel/<string:search_query>', '/api/admin/students/excel')
+api.add_resource(AdminTeachersExcelFile, '/api/admin/teachers/excel/<string:search_query>', '/api/admin/teachers/excel')
 api.add_resource(AdminScheduleExcelFile, '/api/admin/schedules/excel')
 api.add_resource(AdminSubjectsExcelFile, '/api/admin/subjects/excel')
 
@@ -71,6 +63,11 @@ api.add_resource(AdminSubjectsExcelFile, '/api/admin/subjects/excel')
 @app.route('/')
 def index():
     return "Добро пожаловать в школьный дневник! Выберите приложение: <a href='/student'>Для учеников</a> | <a href='/teacher'>Для учителей</a>"
+
+
+@app.errorhandler(404)
+def not_found(error):
+    return render_template('error_404.html')
 
 
 if __name__ == '__main__':

@@ -3,7 +3,9 @@ from sqlalchemy import orm
 from sqlalchemy_serializer import SerializerMixin
 from .db_session import SqlAlchemyBase
 
+
 class Subject(SqlAlchemyBase, SerializerMixin):
+    """Таблица для предметов"""
     __tablename__ = 'subjects'
 
     subject_id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, autoincrement=True)

@@ -20,6 +20,7 @@ logging.basicConfig(
 
 
 def parse_date(value):
+    """Функция для парсинга даты"""
     try:
         return datetime.strptime(value, '%Y-%m-%d').date()
     except ValueError:
@@ -27,6 +28,7 @@ def parse_date(value):
 
 
 class AdminOneStudentAPI(Resource):
+    """Класс для api одного студента"""
     one_student_patch = reqparse.RequestParser()
     one_student_patch.add_argument('username', type=str)
     one_student_patch.add_argument('password', type=str)
@@ -54,6 +56,7 @@ class AdminOneStudentAPI(Resource):
     def get(self, student_id, username=None):
         db_sess = db_session.create_session()
         try:
+            logging.info(f"Fetching student with student_id={student_id} for user={username}")
             student = (db_sess.query(Student)
                        .options(joinedload(Student.user))
                        .options(joinedload(Student.class_))
@@ -64,16 +67,17 @@ class AdminOneStudentAPI(Resource):
 
             if not student:
                 logging.error(f"GET /api/admin/student/{student_id} - Not found for user {username}")
-                abort(404, description=f'Ученик {student_id} не найден.')
-            # Проверяем связанные данные
+                return {'description': 'Not found'}, 404
+
+            logging.info(
+                f"Student found: student_id={student_id}, user_id={student.user_id}, class_id={student.class_id}")
             if not student.user:
                 logging.error(f"Student {student_id} has no associated User")
-                abort(500, description="Ошибка: у студента отсутствуют данные пользователя.")
+                return {'description': 'Ошибка: у студента отсутствуют данные пользователя.'}, 500
             if not student.class_:
                 logging.error(f"Student {student_id} has no associated Class")
-                abort(500, description="Ошибка: у студента отсутствуют данные класса.")
+                return {'description': 'Ошибка: у студента отсутствует класс.'}, 500
 
-            # Преобразуем даты вручную, если они есть
             birth_date = str(student.birth_date) if student.birth_date else None
             grades = [
                 grade.to_dict(only=('grade_id', 'subject_id', 'grade', 'date'))
@@ -86,27 +90,32 @@ class AdminOneStudentAPI(Resource):
 
             student_data = {
                 'Student': {
-                    'user_ID': student.user_id,
+                    'user_id': student.user_id,
+                    'student_id': student.student_id,
                     'username': student.user.username,
                     'first_name': student.user.first_name,
                     'last_name': student.user.last_name,
-                    'email': student.user.email if student.user.email else None,
-                    'phone_number': student.user.phone_number if student.user.phone_number else None,
+                    'email': student.user.email,
+                    'phone_number': student.user.phone_number,
                     'profile_picture': student.user.profile_picture,
-                    'api_key': student.user.api_key if student.user.api_key else None,
+                    'api_key': student.user.api_key,
                     'class': {
                         'class_id': student.class_.class_id,
                         'class_name': student.class_.class_name,
                         'teacher_id': student.class_.teacher_id
                     },
                     'birth_date': birth_date,
-                    'address': student.address if student.address else None,
+                    'address': student.address,
                     'grades': grades,
                     'attendance': attendance
                 }
             }
-            logging.info(f"GET /api/admin/student/{student_id} - Retrieved by user {username}")
+            logging.info(f"GET /api/admin/student/{student_id} - Retrieved by user {username}: {student_data}")
             return student_data, 200
+
+        except Exception as e:
+            logging.error(f"GET /api/admin/student/{student_id} - Error: {str(e)}")
+            return {'description': f"Ошибка при получении данных студента: {str(e)}"}, 500
 
         finally:
             db_sess.close()
@@ -116,7 +125,6 @@ class AdminOneStudentAPI(Resource):
         db_sess = db_session.create_session()
         try:
             if update_data is not None:
-                # Используем данные из аргумента update_data, если он передан
                 username_student = update_data.get('username')
                 password = update_data.get('password')
                 first_name = update_data.get('first_name')
@@ -128,7 +136,6 @@ class AdminOneStudentAPI(Resource):
                 address = update_data.get('address')
                 profile_picture = update_data.get('profile_picture')
 
-                # Валидация обязательных полей
                 required_fields = {
                     'username': username_student,
                     'password': password,
@@ -142,19 +149,16 @@ class AdminOneStudentAPI(Resource):
                 }
                 for field_name, field_value in required_fields.items():
                     if not field_value:
-                        abort(400, description=f'Field {field_name} is required')
+                        return {'description': f'Field {field_name} is required'}, 400
 
-                # Преобразуем class_id в int
                 try:
                     class_id = int(class_id)
                 except ValueError:
-                    abort(400, description='class_id must be an integer')
+                    return {'description': 'class_id must be an integer'}, 400
 
-                # Преобразуем birth_date в дату
                 birth_date = parse_date(birth_date)
 
             else:
-                # Обработка стандартного REST-запроса
                 content_type = request.headers.get('Content-Type', '')
                 if 'multipart/form-data' in content_type:
                     data = request.form
@@ -179,45 +183,44 @@ class AdminOneStudentAPI(Resource):
                                        'class_id', 'birth_date', 'address']
                     for field in required_fields:
                         if not data.get(field):
-                            abort(400, description=f'Field {field} is required')
+                            return {'description': f'Field {field} is required'}, 400
 
                     try:
                         class_id = int(class_id)
                     except ValueError:
-                        abort(400, description='class_id must be an integer')
+                        return {'description': 'class_id must be an integer'}, 400
 
                     birth_date = parse_date(birth_date)
 
                 else:
-                    args = self.one_student_post.parse_args()
-                    username_student = args['username']
-                    password = args['password']
-                    first_name = args['first_name']
-                    last_name = args['last_name']
-                    email = args['email']
-                    phone_number = args['phone_number']
-                    class_id = args['class_id']
-                    birth_date = parse_date(args['birth_date'])
-                    address = args['address']
-                    profile_picture = args.get('profile_picture')
+                    try:
+                        args = self.one_student_post.parse_args()
+                        username_student = args['username']
+                        password = args['password']
+                        first_name = args['first_name']
+                        last_name = args['last_name']
+                        email = args['email']
+                        phone_number = args['phone_number']
+                        class_id = args['class_id']
+                        birth_date = parse_date(args['birth_date'])
+                        address = args['address']
+                        profile_picture = args.get('profile_picture')
+                    except Exception as e:
+                        return {'description': f'Validation error: {str(e)}'}, 400
 
-            # Проверяем, существует ли класс
             class_ = db_sess.query(Class).filter(Class.class_id == class_id).first()
             if not class_:
-                abort(400, description=f'Class with class_id {class_id} does not exist')
+                return {'description': f'Class with class_id {class_id} does not exist'}, 400
 
-            # Проверяем, не существует ли уже пользователь с таким username или email
             existing_user = db_sess.query(User).filter(
                 (User.username == username_student) | (User.email == email)
             ).first()
             if existing_user:
-                abort(400, description='User with this username or email already exists')
+                return {'description': 'User with this username or email already exists'}, 400
 
-            # Генерируем student_id
             max_student_id = db_sess.query(func.max(Student.student_id)).scalar() or 0
             new_student_id = max_student_id + 1
 
-            # Создаем нового пользователя
             with open('static/images/base.png', 'rb') as f:
                 file_content = f.read()
                 base_picture = base64.b64encode(file_content).decode('utf-8')
@@ -235,7 +238,6 @@ class AdminOneStudentAPI(Resource):
             db_sess.add(new_user)
             db_sess.flush()
 
-            # Создаем нового студента
             new_student = Student(
                 user_id=new_user.user_id,
                 student_id=new_student_id,
@@ -264,7 +266,7 @@ class AdminOneStudentAPI(Resource):
         except Exception as e:
             db_sess.rollback()
             logging.error(f"POST /api/admin/student - Error: {str(e)}")
-            abort(500, description=f"Ошибка при создании студента: {str(e)}")
+            return {'description': f"Ошибка при создании студента: {str(e)}"}, 500
 
         finally:
             db_sess.close()
@@ -278,18 +280,18 @@ class AdminOneStudentAPI(Resource):
                        .options(joinedload(Student.class_))
                        .filter(Student.student_id == student_id)
                        .first())
+
             if not student:
                 logging.error(f"PATCH /api/admin/student/{student_id} - Not found for user {username}")
-                abort(404, description=f'Ученик {student_id} не найден.')
+                return {'description': f'Ученик {student_id} не найден.'}, 404
+
             if not student.user:
                 logging.error(f"Student {student_id} has no associated User")
-                abort(500, description="Ошибка: у студента отсутствуют данные пользователя.")
+                return {'description': "Ошибка: у студента отсутствуют данные пользователя."}, 500
 
-            # Если update_data передано (например, из маршрута), используем его
             if update_data is not None:
                 args = update_data
             else:
-                # Иначе проверяем Content-Type и обрабатываем запрос
                 content_type = request.headers.get('Content-Type', '')
                 if 'application/json' in content_type:
                     args = self.one_student_patch.parse_args()
@@ -302,18 +304,18 @@ class AdminOneStudentAPI(Resource):
                         if file and file.filename:
                             args['profile_picture'] = base64.b64encode(file.read()).decode('utf-8')
                 else:
-                    abort(415, description="Unsupported Content-Type. Use 'application/json' or 'multipart/form-data'.")
+                    return {
+                        'description': "Unsupported Content-Type. Use 'application/json' or 'multipart/form-data'."}, 415
 
             user = student.user
             updated_fields = {}
             if args.get('username') is not None:
-                # Проверяем, не занят ли новый username
                 existing_user = db_sess.query(User).filter(
                     User.username == args['username'],
                     User.user_id != user.user_id
                 ).first()
                 if existing_user:
-                    abort(400, description='Username already taken')
+                    return {'description': 'Username already taken'}, 400
                 user.username = args['username']
                 updated_fields['username'] = user.username
             if args.get('password') is not None:
@@ -326,13 +328,12 @@ class AdminOneStudentAPI(Resource):
                 user.last_name = args['last_name']
                 updated_fields['last_name'] = user.last_name
             if args.get('email') is not None:
-                # Проверяем, не занят ли новый email
                 existing_user = db_sess.query(User).filter(
                     User.email == args['email'],
                     User.user_id != user.user_id
                 ).first()
                 if existing_user:
-                    abort(400, description='Email already taken')
+                    return {'description': 'Email already taken'}, 400
                 user.email = args['email']
                 updated_fields['email'] = user.email
             if args.get('phone_number') is not None:
@@ -345,11 +346,10 @@ class AdminOneStudentAPI(Resource):
                 try:
                     class_id = int(args['class_id'])
                 except ValueError:
-                    abort(400, description='class_id must be an integer')
-                # Проверяем, существует ли класс
+                    return {'description': 'class_id must be an integer'}, 400
                 class_ = db_sess.query(Class).filter(Class.class_id == class_id).first()
                 if not class_:
-                    abort(400, description=f'Class with class_id {class_id} does not exist')
+                    return {'description': f'Class with class_id {class_id} does not exist'}, 400
                 student.class_id = class_id
                 updated_fields['class_id'] = student.class_id
             if args.get('birth_date') is not None:
@@ -370,7 +370,7 @@ class AdminOneStudentAPI(Resource):
         except Exception as e:
             db_sess.rollback()
             logging.error(f"PATCH /api/admin/student/{student_id} - Error: {str(e)}")
-            abort(500, description=f"Ошибка при обновлении студента: {str(e)}")
+            return {'description': f"Ошибка при обновлении студента: {str(e)}"}, 500
 
         finally:
             db_sess.close()
@@ -392,9 +392,8 @@ class AdminOneStudentAPI(Resource):
                 logging.error(f"Student {student_id} has no associated User")
                 return {'description': "Ошибка: у студента отсутствуют данные пользователя."}, 500
 
-            # Удаляем студента и связанного пользователя
-            db_sess.delete(student.user)  # Удаляем пользователя (каскадно удалит студента, если настроено)
-            db_sess.delete(student)  # Удаляем студента напрямую для надежности
+            db_sess.delete(student.user)
+            db_sess.delete(student)
             db_sess.commit()
 
             logging.info(f"DELETE /api/admin/student/{student_id} - Deleted by user {username}")
@@ -413,28 +412,51 @@ class AdminOneStudentAPI(Resource):
 
 
 class AdminAllStudentsAPI(Resource):
-    @admin_authorization_required("/api/admin/students", method="GET")
-    def get(self, username=None):
-        """Получение списка всех студентов."""
+    """Класс для api всех студентов"""
+    @admin_authorization_required("/api/admin/students/<string:search_query>", method="GET")
+    def get(self, username=None, search=None):
         db_sess = db_session.create_session()
         try:
-            # Запрашиваем всех студентов с подгрузкой связанных данных (user и class)
-            students = (db_sess.query(Student)
-                        .options(joinedload(Student.user))
-                        .options(joinedload(Student.class_))
-                        .all())
+            logging.info(
+                f"Received search query in AdminAllStudentsAPI: '{search}' (type: {type(search)}, raw: {repr(search)})")
+            query = (db_sess.query(Student)
+                     .options(joinedload(Student.user))
+                     .options(joinedload(Student.class_)))
+
+            if search and search.strip():
+                search_term = f"%{search.strip()}%"
+                logging.info(f"Applying search filter with term: '{search_term}'")
+                query = query.join(User).join(Class).filter(
+                    (User.first_name.ilike(search_term)) |
+                    (User.last_name.ilike(search_term)) |
+                    (func.concat(User.first_name, ' ', User.last_name).ilike(search_term)) |
+                    (User.username.ilike(search_term)) |
+                    (Class.class_name.ilike(search_term))
+                )
+                logging.info(f"Generated SQL query: {str(query)}")
+            else:
+                logging.info("No valid search query provided, returning all students")
+
+            students = query.all()
+            logging.info(f"Found {len(students)} students for search: '{search}'")
 
             if not students:
-                logging.info(f"GET /api/admin/students - No students found by {username}")
+                logging.info(f"GET /api/admin/students - No students found by {username} with search='{search}'")
                 return {
                     'message': 'Список студентов пуст.',
                     'students': []
                 }, 200
 
-            # Формируем список студентов для ответа
             students_list = []
             for student in students:
-                classes = {'class_id': student.class_.class_id, 'class_name': student.class_.class_name}
+                if not student.user or not student.class_:
+                    logging.warning(f"Student {student.student_id} has incomplete associated data")
+                    continue
+                classes = {
+                    'class_id': student.class_.class_id,
+                    'class_name': student.class_.class_name,
+                    'teacher_id': student.class_.teacher_id
+                } if student.class_ else {'class_id': None, 'class_name': 'Без класса', 'teacher_id': None}
                 student_data = {
                     'student_id': student.student_id,
                     'user_id': student.user_id,
@@ -445,13 +467,13 @@ class AdminAllStudentsAPI(Resource):
                     'phone_number': student.user.phone_number if student.user else None,
                     'profile_picture': student.user.profile_picture if student.user else None,
                     'class': classes,
-                    'class_name': student.class_.class_name if student.class_ else None,
                     'birth_date': student.birth_date.strftime('%Y-%m-%d') if student.birth_date else None,
                     'address': student.address
                 }
                 students_list.append(student_data)
 
-            logging.info(f"GET /api/admin/students - Retrieved {len(students)} students by {username}")
+            logging.info(
+                f"GET /api/admin/students - Retrieved {len(students)} students by {username} with search='{search}'")
             return {
                 'message': f'Найдено {len(students)} студентов.',
                 'students': students_list
@@ -459,7 +481,7 @@ class AdminAllStudentsAPI(Resource):
 
         except Exception as e:
             logging.error(f"GET /api/admin/students - Error: {str(e)}")
-            abort(500, description="Внутренняя ошибка сервера.")
+            return {'description': f"Внутренняя ошибка сервера: {str(e)}"}, 500
 
         finally:
             db_sess.close()

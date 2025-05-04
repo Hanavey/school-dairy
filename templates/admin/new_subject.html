@@ -1,15 +1,26 @@
 {% extends "admin/base.html" %}
 
+{% block title %}
+    Создание предмета
+{% endblock %}
+
 {% block content %}
-<h1>Добавить новый предмет</h1>
-{% if message %}
-<p class="text-danger">{{ message }}</p>
-{% endif %}
-<form method="POST">
-    {{ form.hidden_tag() }}
-    <div class="form-group">
-        {{ form.subject_name.label }} {{ form.subject_name(class="form-control") }}
-    </div>
-    {{ form.submit(class="btn btn-primary") }}
-</form>
+<div class="container mt-4">
+    <h2 class="text-light mb-4">Создание нового предмета</h2>
+
+    <form method="POST">
+        {{ form.hidden_tag() }}
+        <div class="mb-3">
+            {{ form.subject_name.label(class="form-label text-light") }}
+            {{ form.subject_name(class="form-control") }}
+            {% for error in form.subject_name.errors %}
+                <span class="text-danger">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="d-flex justify-content-between">
+            {{ form.submit(class="btn btn-primary") }}
+            <a href="{{ url_for('admin.subjects') }}" class="btn btn-secondary">Отмена</a>
+        </div>
+    </form>
+</div>
 {% endblock %}

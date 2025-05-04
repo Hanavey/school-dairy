@@ -6,66 +6,49 @@
 
 {% block content %}
 <div class="container mt-4">
-    <!-- Строка поиска и сообщение о количестве учителей -->
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <input type="text" id="searchInput" class="form-control" placeholder="Поиск по имени, фамилии или классу...">
-        </div>
-        <div class="col-md-6 text-md-end text-start mt-2 mt-md-0">
-            <p class="text-light" id="teacherCount">Найдено учителей: {{ teachers|length }}</p>
-        </div>
-    </div>
+    <h1 class="text-light mb-4">Список учителей</h1>
 
-    <!-- Сетка карточек учителей -->
-    <div class="row" id="teacherCards">
+    <!-- Форма поиска -->
+    <form method="GET" action="{{ url_for('admin.teachers') }}" class="mb-4">
+        {{ form.hidden_tag() }}
+        <div class="input-group">
+            {{ form.search(class="form-control", placeholder="Поиск по имени или фамилии", value=search_query) }}
+            {{ form.submit(class="btn btn-primary") }}
+        </div>
+    </form>
+
+    <!-- Сетка карточек -->
+    <div class="row">
         {% for teacher in teachers %}
-        <div class="col-md-4 mb-4 teacher-card">
-            <a href="/admin/teacher/{{ teacher.teacher_id }}" class="text-decoration-none">
+        <div class="col-md-4 mb-4">
+            <a href="{{ url_for('admin.edit_teacher', teacher_id=teacher.teacher_id) }}" class="text-decoration-none">
                 <div class="card bg-dark text-light h-100">
                     <img src="data:image/png;base64,{{ teacher.profile_picture }}" class="card-img-top" alt="Фото учителя">
                     <div class="card-body text-center">
-                        <h5 class="card-title">
-                            {{ teacher.last_name }} {{ teacher.first_name }}
-                            {% if teacher.classes %}
-                                {{ teacher.classes[0].class_name }}
-                            {% endif %}
-                        </h5>
+                        <h5 class="card-title">{{ teacher.last_name }} {{ teacher.first_name }}</h5>
                     </div>
                 </div>
             </a>
         </div>
         {% endfor %}
-
-        <!-- Карточка для создания нового учителя -->
         <div class="col-md-4 mb-4">
-            <a href="/admin/teacher/new" class="text-decoration-none">
+            <a href="{{ url_for('admin.new_teacher') }}" class="text-decoration-none">
                 <div class="card bg-dark text-light h-100 d-flex align-items-center justify-content-center">
-                    <i class="bi bi-plus text-white" style="font-size: 4rem;"></i>
+                    <i class="bi bi-plus" style="font-size: 4rem;"></i>
                 </div>
             </a>
         </div>
-        <a href="/admin/teachers/excel" class="btn btn-primary">Скачать в формате excel</a>
     </div>
+
+    <!-- Экспорт в Excel -->
+    <a href="{{ url_for('admin.teachers_excel', search=search_query or '') }}" class="btn btn-primary mb-4">Скачать в Excel</a>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
 </div>
-
-<!-- JavaScript для фильтрации и обновления счетчика -->
-<script>
-document.getElementById('searchInput').addEventListener('input', function() {
-    const searchText = this.value.toLowerCase();
-    const cards = document.querySelectorAll('.teacher-card');
-    let visibleCount = 0;
-
-    cards.forEach(card => {
-        const title = card.querySelector('.card-title').textContent.toLowerCase();
-        if (title.includes(searchText)) {
-            card.style.display = 'block';
-            visibleCount++;
-        } else {
-            card.style.display = 'none';
-        }
-    });
-
-    document.getElementById('teacherCount').textContent = `Найдено учителей: ${visibleCount}`;
-});
-</script>
 {% endblock %}

@@ -3,7 +3,9 @@ from sqlalchemy import orm
 from sqlalchemy_serializer import SerializerMixin
 from .db_session import SqlAlchemyBase
 
+
 class Schedule(SqlAlchemyBase, SerializerMixin):
+    """Таблица для расписания"""
     __tablename__ = 'schedule'
 
     schedule_id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, autoincrement=True)

@@ -3,7 +3,9 @@ from sqlalchemy import orm
 from sqlalchemy_serializer import SerializerMixin
 from .db_session import SqlAlchemyBase
 
+
 class Homework(SqlAlchemyBase, SerializerMixin):
+    """Таблица для домашнего задания"""
     __tablename__ = 'homework'
 
     homework_id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, autoincrement=True)

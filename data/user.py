@@ -8,6 +8,7 @@ import uuid
 
 
 class User(SqlAlchemyBase, UserMixin, SerializerMixin):
+    """Таблица для пользователей"""
     __tablename__ = 'users'
 
     user_id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, autoincrement=True)

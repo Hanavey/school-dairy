@@ -1,81 +1,43 @@
-import logging
-from logging.config import fileConfig
-from data.db_session import SqlAlchemyBase, get_engine  # Import get_engine
-from alembic import context
+from alembic import op
+import sqlalchemy as sa
 
-# this is the Alembic Config object, which provides
-# access to the values within the .ini file in use.
-config = context.config
+def upgrade():
+    # Проверяем, существует ли таблица teacher_position_assignments
+    if not op.get_context().dialect.has_table(op.get_bind(), 'teacher_position_assignments'):
+        op.create_table(
+            'teacher_position_assignments',
+            sa.Column('assignment_id', sa.Integer(), autoincrement=True, nullable=False),
+            sa.Column('teacher_id', sa.Integer(), nullable=True),
+            sa.Column('position_id', sa.Integer(), nullable=True),
+            sa.ForeignKeyConstraint(['teacher_id'], ['teachers.teacher_id'], ),
+            sa.ForeignKeyConstraint(['position_id'], ['teacher_positions.position_id'], ),
+            sa.PrimaryKeyConstraint('assignment_id')
+        )
+    else:
+        # Если таблица существует, проверяем наличие столбца assignment_id
+        if not op.get_context().dialect.has_column(op.get_bind(), 'teacher_position_assignments', 'assignment_id'):
+            with op.batch_alter_table('teacher_position_assignments') as batch_op:
+                batch_op.add_column(sa.Column('assignment_id', sa.Integer(), autoincrement=True, nullable=False))
+                # Если нужно, обновите первичный ключ
+                batch_op.drop_constraint('primary', type_='primary')
+                batch_op.create_primary_key('pk_teacher_position_assignments', ['assignment_id'])
 
-# Interpret the config file for Python logging.
-# This line sets up loggers basically.
-fileConfig(config.config_file_name)
-logger = logging.getLogger('alembic.env')
-
-# add your model's MetaData object here
-# for 'autogenerate' support
-target_metadata = SqlAlchemyBase.metadata  # Set target_metadata directly
-
-# Set the SQLAlchemy URL from the engine
-config.set_main_option('sqlalchemy.url', str(get_engine().url).replace('%', '%%'))
-
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
-
-def run_migrations_offline():
-    """Run migrations in 'offline' mode.
-
-    This configures the context with just a URL
-    and not an Engine, though an Engine is acceptable
-    here as well.  By skipping the Engine creation
-    we don't even need a DBAPI to be available.
-
-    Calls to context.execute() here emit the given string to the
-    script output.
-    """
-    url = config.get_main_option("sqlalchemy.url")
-    context.configure(
-        url=url,
-        target_metadata=target_metadata,
-        literal_binds=True,
-        render_as_batch=True  # Add this for SQLite support
+    # Создаём таблицу assignment_class_links
+    op.create_table(
+        'assignment_class_links',
+        sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+        sa.Column('assignment_id', sa.Integer(), nullable=True),
+        sa.Column('class_id', sa.Integer(), nullable=True),
+        sa.ForeignKeyConstraint(['assignment_id'], ['teacher_position_assignments.assignment_id'], ),
+        sa.ForeignKeyConstraint(['class_id'], ['classes.class_id'], ),
+        sa.PrimaryKeyConstraint('id')
     )
 
-    with context.begin_transaction():
-        context.run_migrations()
-
-def run_migrations_online():
-    """Run migrations in 'online' mode.
-
-    In this scenario we need to create an Engine
-    and associate a connection with the context.
-    """
-    # this callback is used to prevent an auto-migration from being generated
-    # when there are no changes to the schema
-    # reference: http://alembic.zzzcomputing.com/en/latest/cookbook.html
-    def process_revision_directives(context, revision, directives):
-        if getattr(config.cmd_opts, 'autogenerate', False):
-            script = directives[0]
-            if script.upgrade_ops.is_empty():
-                directives[:] = []
-                logger.info('No changes in schema detected.')
-
-    connectable = get_engine()  # Use the engine from db_session
-
-    with connectable.connect() as connection:
-        context.configure(
-            connection=connection,
-            target_metadata=target_metadata,
-            process_revision_directives=process_revision_directives,
-            render_as_batch=True  # Add this for SQLite support
-        )
-
-        with context.begin_transaction():
-            context.run_migrations()
-
-if context.is_offline_mode():
-    run_migrations_offline()
-else:
-    run_migrations_online()
+def downgrade():
+    op.drop_table('assignment_class_links')
+    # Если добавляли столбец assignment_id, удаляем его
+    if op.get_context().dialect.has_column(op.get_bind(), 'teacher_position_assignments', 'assignment_id'):
+        with op.batch_alter_table('teacher_position_assignments') as batch_op:
+            batch_op.drop_column('assignment_id')
+            # Восстанавливаем старый первичный ключ, если нужно
+            # batch_op.create_primary_key('primary', ['старый_ключ'])

@@ -7,13 +7,16 @@ from data.user import User
 from data.classes import Class
 from data.teacher_position_assignment import TeacherPositionAssignment
 from data.teacher_position import TeacherPosition
+from data.subject import Subject
+from data.teacher_subjects_link import TeacherSubjectLink
+from data.schedule import Schedule
 from flask_restful import Resource, reqparse, abort
 from flask import request
 from decorators.authorization_admin_decorator import admin_authorization_required
 import logging
 import base64
 
-# Настройка логирования
+
 logging.basicConfig(
     filename='api_access.log',
     level=logging.INFO,
@@ -21,13 +24,15 @@ logging.basicConfig(
 )
 
 def parse_date(value):
+    """Функция для парсинга даты"""
     try:
         return datetime.strptime(value, '%Y-%m-%d').date()
     except ValueError:
         raise ValueError("Incorrect date format. Use YYYY-MM-DD")
 
+
 class AdminOneTeacherAPI(Resource):
-    # Парсер для PATCH-запросов
+    """Класс для api одного учителя"""
     one_teacher_patch = reqparse.RequestParser()
     one_teacher_patch.add_argument('username', type=str)
     one_teacher_patch.add_argument('password', type=str)
@@ -36,11 +41,9 @@ class AdminOneTeacherAPI(Resource):
     one_teacher_patch.add_argument('email', type=str)
     one_teacher_patch.add_argument('phone_number', type=str)
     one_teacher_patch.add_argument('profile_picture', type=str)
-    one_teacher_patch.add_argument('position_id', type=int)  # ID должности
-    one_teacher_patch.add_argument('class_id', type=int)     # ID класса (может быть null)
-    one_teacher_patch.add_argument('subject_id', type=int)   # ID предмета (может быть null)
+    one_teacher_patch.add_argument('position_id', type=int)
+    one_teacher_patch.add_argument('subject_id', type=int)
 
-    # Парсер для POST-запросов
     one_teacher_post = reqparse.RequestParser()
     one_teacher_post.add_argument('username', type=str, required=True)
     one_teacher_post.add_argument('password', type=str, required=True)
@@ -49,19 +52,17 @@ class AdminOneTeacherAPI(Resource):
     one_teacher_post.add_argument('email', type=str, required=True)
     one_teacher_post.add_argument('phone_number', type=str, required=True)
     one_teacher_post.add_argument('position_id', type=int, required=True)
-    one_teacher_post.add_argument('class_id', type=int)     # Необязательное поле
-    one_teacher_post.add_argument('subject_id', type=int)   # Необязательное поле
+    one_teacher_post.add_argument('subject_id', type=int)
 
     @admin_authorization_required("/api/admin/teacher/<teacher_id>", method="GET")
     def get(self, teacher_id, username=None):
-        """Получение информации об одном учителе по teacher_id."""
         db_sess = db_session.create_session()
         try:
             teacher = (db_sess.query(Teacher)
                        .options(joinedload(Teacher.user))
                        .options(joinedload(Teacher.classes))
                        .options(joinedload(Teacher.schedules))
-                       .options(joinedload(Teacher.positions))
+                       .options(joinedload(Teacher.positions).joinedload(TeacherPositionAssignment.subject_links))
                        .filter(Teacher.teacher_id == teacher_id)
                        .first())
 
@@ -73,30 +74,23 @@ class AdminOneTeacherAPI(Resource):
                 logging.error(f"Teacher {teacher_id} has no associated User")
                 return {'description': "Ошибка: у учителя отсутствуют данные пользователя."}, 500
 
-            # Формируем данные об учителе
-            classes = [
-                {'class_id': cls.class_id, 'class_name': cls.class_name}
-                for cls in teacher.classes
-            ]
-            schedules = [
-                {
-                    'schedule_id': sched.schedule_id,
-                    'class_id': sched.class_id,
-                    'subject_id': sched.subject_id,
-                    'day_of_week': sched.day_of_week,
-                    'start_time': str(sched.start_time) if sched.start_time else None,
-                    'end_time': str(sched.end_time) if sched.end_time else None
-                }
-                for sched in teacher.schedules
-            ]
-            positions = [
-                {
-                    'position_id': pos.position_id,
-                    'class_id': pos.class_id,
-                    'subject_id': pos.subject_id
-                }
-                for pos in teacher.positions
-            ]
+            classes = [{'class_id': cls.class_id, 'class_name': cls.class_name} for cls in teacher.classes]
+            schedules = [{
+                'schedule_id': sched.schedule_id,
+                'class_id': sched.class_id,
+                'subject_id': sched.subject_id,
+                'day_of_week': sched.day_of_week,
+                'start_time': sched.start_time,
+                'end_time': sched.end_time
+            } for sched in teacher.schedules]
+            positions = [{
+                'position_id': pos.position.position_id,
+                'position_name': pos.position.position_name,
+                'subjects': [{'subject_id': link.subject.subject_id, 'subject_name': link.subject.subject_name}
+                             for link in pos.subject_links]
+            } for pos in teacher.positions]
+
+            class_id = classes[0]['class_id'] if classes else None
 
             teacher_data = {
                 'Teacher': {
@@ -105,16 +99,18 @@ class AdminOneTeacherAPI(Resource):
                     'username': teacher.user.username,
                     'first_name': teacher.user.first_name,
                     'last_name': teacher.user.last_name,
-                    'email': teacher.user.email if teacher.user.email else None,
-                    'phone_number': teacher.user.phone_number if teacher.user.phone_number else None,
+                    'email': teacher.user.email,
+                    'phone_number': teacher.user.phone_number,
                     'profile_picture': teacher.user.profile_picture,
                     'api_key': teacher.user.api_key,
+                    'class_id': class_id,
                     'classes': classes,
                     'schedules': schedules,
                     'positions': positions
                 }
             }
-            logging.info(f"GET /api/admin/teacher/{teacher_id} - Retrieved by user {username}")
+            logging.info(
+                f"GET /api/admin/teacher/{teacher_id} - Retrieved by user {username}, data size: {len(str(teacher_data))} bytes")
             return teacher_data, 200
 
         except Exception as e:
@@ -126,25 +122,22 @@ class AdminOneTeacherAPI(Resource):
 
     @admin_authorization_required("/api/admin/teacher", method="POST")
     def post(self, username=None, update_data=None):
-        """Создание нового учителя."""
         db_sess = db_session.create_session()
         try:
             if update_data is not None:
-                # Используем данные из аргумента update_data, если он передан
-                username = update_data.get('username')
+                username_teacher = update_data.get('username')
                 password = update_data.get('password')
                 first_name = update_data.get('first_name')
                 last_name = update_data.get('last_name')
                 email = update_data.get('email')
                 phone_number = update_data.get('phone_number')
                 position_id = update_data.get('position_id')
+                subject_ids = update_data.get('subject_ids', [])
                 class_id = update_data.get('class_id')
-                subject_id = update_data.get('subject_id')
                 profile_picture = update_data.get('profile_picture')
 
-                # Валидация обязательных полей
                 required_fields = {
-                    'username': username,
+                    'username': username_teacher,
                     'password': password,
                     'first_name': first_name,
                     'last_name': last_name,
@@ -156,122 +149,115 @@ class AdminOneTeacherAPI(Resource):
                     if not field_value:
                         return {'description': f'Field {field_name} is required'}, 400
 
-                # Преобразуем position_id в int
                 try:
                     position_id = int(position_id)
                 except ValueError:
                     return {'description': 'position_id must be an integer'}, 400
 
-                # Преобразуем class_id в int, если передан
+                for subject_id in subject_ids:
+                    try:
+                        subject_id = int(subject_id)
+                    except ValueError:
+                        return {'description': f'subject_id {subject_id} must be an integer'}, 400
+
                 if class_id:
                     try:
                         class_id = int(class_id)
                     except ValueError:
                         return {'description': 'class_id must be an integer'}, 400
 
-                # Преобразуем subject_id в int, если передан
-                if subject_id:
-                    try:
-                        subject_id = int(subject_id)
-                    except ValueError:
-                        return {'description': 'subject_id must be an integer'}, 400
-
             else:
-                # Проверяем Content-Type запроса
                 content_type = request.headers.get('Content-Type', '')
-
                 if 'multipart/form-data' in content_type:
-                    # Обработка multipart/form-data (для формы)
                     data = request.form
-                    username = data.get('username')
+                    username_teacher = data.get('username')
                     password = data.get('password')
                     first_name = data.get('first_name')
                     last_name = data.get('last_name')
                     email = data.get('email')
                     phone_number = data.get('phone_number')
                     position_id = data.get('position_id')
+                    subject_ids = data.getlist('subject_ids')
                     class_id = data.get('class_id')
-                    subject_id = data.get('subject_id')
                     profile_picture = None
 
-                    # Проверяем, есть ли файл в запросе
                     if 'profile_picture' in request.files:
                         file = request.files['profile_picture']
                         if file and file.filename:
-                            # Читаем файл и конвертируем в Base64
                             file_content = file.read()
                             profile_picture = base64.b64encode(file_content).decode('utf-8')
 
-                    # Валидация обязательных полей
                     required_fields = ['username', 'password', 'first_name', 'last_name', 'email', 'phone_number',
                                        'position_id']
                     for field in required_fields:
                         if not data.get(field):
                             return {'description': f'Field {field} is required'}, 400
 
-                    # Преобразуем position_id в int
                     try:
                         position_id = int(position_id)
                     except ValueError:
                         return {'description': 'position_id must be an integer'}, 400
 
-                    # Преобразуем class_id в int, если передан
+                    for subject_id in subject_ids:
+                        try:
+                            subject_id = int(subject_id)
+                        except ValueError:
+                            return {'description': f'subject_id {subject_id} must be an integer'}, 400
+
                     if class_id:
                         try:
                             class_id = int(class_id)
                         except ValueError:
                             return {'description': 'class_id must be an integer'}, 400
 
-                    # Преобразуем subject_id в int, если передан
-                    if subject_id:
-                        try:
-                            subject_id = int(subject_id)
-                        except ValueError:
-                            return {'description': 'subject_id must be an integer'}, 400
-
                 else:
-                    # Обработка application/json (для сторонних обращений)
-                    args = self.one_teacher_post.parse_args()
-                    username = args['username']
-                    password = args['password']
-                    first_name = args['first_name']
-                    last_name = args['last_name']
-                    email = args['email']
-                    phone_number = args['phone_number']
-                    position_id = args['position_id']
-                    class_id = args.get('class_id')
-                    subject_id = args.get('subject_id')
-                    profile_picture = args.get('profile_picture')  # Для JSON это необязательное поле
+                    try:
+                        args = self.one_teacher_post.parse_args()
+                        username_teacher = args['username']
+                        password = args['password']
+                        first_name = args['first_name']
+                        last_name = args['last_name']
+                        email = args['email']
+                        phone_number = args['phone_number']
+                        position_id = args['position_id']
+                        subject_ids = args.get('subject_ids', [])
+                        class_id = args.get('class_id')
+                        profile_picture = args.get('profile_picture')
+                    except Exception as e:
+                        return {'description': f'Validation error: {str(e)}'}, 400
 
-            # Проверяем, существует ли должность
+            logging.info(f"POST /api/admin/teacher - Input data: {update_data}")
+
             position = db_sess.query(TeacherPosition).filter(TeacherPosition.position_id == position_id).first()
             if not position:
                 return {'description': f'Position with position_id {position_id} does not exist'}, 400
 
-            # Проверяем, существует ли класс, если передан class_id
+            for subject_id in subject_ids:
+                if subject_id:
+                    subject = db_sess.query(Subject).filter(Subject.subject_id == subject_id).first()
+                    if not subject:
+                        return {'description': f'Subject with subject_id {subject_id} does not exist'}, 400
+
             if class_id:
                 class_ = db_sess.query(Class).filter(Class.class_id == class_id).first()
                 if not class_:
                     return {'description': f'Class with class_id {class_id} does not exist'}, 400
 
-            # Проверяем, не существует ли уже пользователь с таким username или email
             existing_user = db_sess.query(User).filter(
-                (User.username == username) | (User.email == email)
+                (User.username == username_teacher) | (User.email == email)
             ).first()
             if existing_user:
                 return {'description': 'User with this username or email already exists'}, 400
 
-            # Генерируем teacher_id (максимальный + 1)
             max_teacher_id = db_sess.query(func.max(Teacher.teacher_id)).scalar() or 0
             new_teacher_id = max_teacher_id + 1
 
-            # Создаем нового пользователя
             with open('static/images/base.png', 'rb') as f:
                 file_content = f.read()
                 base_picture = base64.b64encode(file_content).decode('utf-8')
 
             new_user = User(
-                username=username,
+                username=username_teacher,
                 first_name=first_name,
                 last_name=last_name,
                 email=email,
@@ -279,31 +265,39 @@ class AdminOneTeacherAPI(Resource):
                 profile_picture=profile_picture if profile_picture else base_picture
             )
             new_user.set_password(password)
+            new_user.generate_api_key()
             db_sess.add(new_user)
-            db_sess.flush()  # Получаем user_id
+            db_sess.flush()
 
-            # Создаем нового учителя
             new_teacher = Teacher(
                 user_id=new_user.user_id,
                 teacher_id=new_teacher_id
             )
             db_sess.add(new_teacher)
-            db_sess.flush()  # Получаем teacher_id
+            db_sess.flush()
 
-            # Создаем запись в TeacherPositionAssignment
+            if class_id:
+                class_ = db_sess.query(Class).filter(Class.class_id == class_id).first()
+                class_.teacher_id = new_teacher.teacher_id
+
             new_assignment = TeacherPositionAssignment(
                 teacher_id=new_teacher.teacher_id,
-                position_id=position_id,
-                class_id=class_id if class_id else None,
-                subject_id=subject_id if subject_id else None
+                position_id=position_id
             )
             db_sess.add(new_assignment)
+            db_sess.flush()
+
+            for subject_id in subject_ids:
+                if subject_id:
+                    new_subject_link = TeacherSubjectLink(
+                        assignment_id=new_assignment.assignment_id,
+                        subject_id=subject_id
+                    )
+                    db_sess.add(new_subject_link)
+
             db_sess.commit()
 
-            # Логируем успешное создание
             logging.info(f"POST /api/admin/teacher - Teacher {new_teacher.teacher_id} created by user {username}")
-
-            # Возвращаем данные о созданном учителе
             return {
                 'message': 'Учитель успешно создан.',
                 'teacher': {
@@ -313,7 +307,7 @@ class AdminOneTeacherAPI(Resource):
                     'email': new_user.email,
                     'position_id': position_id,
                     'class_id': class_id,
-                    'subject_id': subject_id
+                    'subject_ids': subject_ids
                 }
             }, 201
 
@@ -327,11 +321,11 @@ class AdminOneTeacherAPI(Resource):
 
     @admin_authorization_required("/api/admin/teacher/<teacher_id>", method="PATCH")
     def patch(self, teacher_id, username=None, update_data=None):
-        """Обновление данных учителя и его должности по teacher_id."""
         db_sess = db_session.create_session()
         try:
             teacher = (db_sess.query(Teacher)
                        .options(joinedload(Teacher.user))
+                       .options(joinedload(Teacher.classes))
                        .options(joinedload(Teacher.positions))
                        .filter(Teacher.teacher_id == teacher_id)
                        .first())
@@ -344,11 +338,9 @@ class AdminOneTeacherAPI(Resource):
                 logging.error(f"Teacher {teacher_id} has no associated User")
                 return {'description': "Ошибка: у учителя отсутствуют данные пользователя."}, 500
 
-            # Если update_data передано (например, из маршрута), используем его
             if update_data is not None:
                 args = update_data
             else:
-                # Иначе проверяем Content-Type и обрабатываем запрос
                 content_type = request.headers.get('Content-Type', '')
                 if 'application/json' in content_type:
                     args = self.one_teacher_patch.parse_args()
@@ -360,15 +352,17 @@ class AdminOneTeacherAPI(Resource):
                         file = request.files['profile_picture']
                         if file and file.filename:
                             args['profile_picture'] = base64.b64encode(file.read()).decode('utf-8')
+                    if 'subject_ids' in request.form:
+                        args['subject_ids'] = request.form.getlist('subject_ids')
                 else:
                     return {
                         'description': "Unsupported Content-Type. Use 'application/json' or 'multipart/form-data'."}, 415
 
-            # Обновляем данные пользователя, если они переданы
+            logging.info(f"PATCH /api/admin/teacher/{teacher_id} - Input data: {args}")
+
             user = teacher.user
             updated_fields = {}
             if args.get('username') is not None:
-                # Проверяем, не занят ли новый username
                 existing_user = db_sess.query(User).filter(
                     User.username == args['username'],
                     User.user_id != user.user_id
@@ -387,7 +381,6 @@ class AdminOneTeacherAPI(Resource):
                 user.last_name = args['last_name']
                 updated_fields['last_name'] = user.last_name
             if args.get('email') is not None:
-                # Проверяем, не занят ли новый email
                 existing_user = db_sess.query(User).filter(
                     User.email == args['email'],
                     User.user_id != user.user_id
@@ -403,60 +396,72 @@ class AdminOneTeacherAPI(Resource):
                 user.profile_picture = args['profile_picture']
                 updated_fields['profile_picture'] = 'updated'
 
-            # Обновляем или добавляем запись в TeacherPositionAssignment
+            if args.get('class_id') is not None:
+                class_id = args['class_id']
+                if class_id:
+                    try:
+                        class_id = int(class_id)
+                    except ValueError:
+                        return {'description': 'class_id must be an integer'}, 400
+                    class_ = db_sess.query(Class).filter(Class.class_id == class_id).first()
+                    if not class_:
+                        return {'description': f'Class with class_id {class_id} does not exist'}, 400
+                    existing_class = db_sess.query(Class).filter(Class.teacher_id == teacher.teacher_id).first()
+                    if existing_class:
+                        existing_class.teacher_id = None
+                    class_.teacher_id = teacher.teacher_id
+                    updated_fields['class_id'] = class_id
+
             if args.get('position_id') is not None:
-                # Проверяем, существует ли указанная должность
-                position_exists = db_sess.query(TeacherPosition).filter(
+                position = db_sess.query(TeacherPosition).filter(
                     TeacherPosition.position_id == args['position_id']).first()
-                if not position_exists:
-                    logging.error(f"PATCH /api/admin/teacher/{teacher_id} - Position {args['position_id']} not found")
-                    return {'description': f"Должность с ID {args['position_id']} не найдена."}, 400
+                if not position:
+                    return {'description': f"Position with ID {args['position_id']} not found"}, 400
 
-                # Проверяем, существует ли запись в TeacherPositionAssignment
-                position_assignment = db_sess.query(TeacherPositionAssignment).filter(
-                    TeacherPositionAssignment.teacher_id == teacher.teacher_id,
-                    TeacherPositionAssignment.position_id == args['position_id']
-                ).first()
+                old_assignments = db_sess.query(TeacherPositionAssignment).filter(
+                    TeacherPositionAssignment.teacher_id == teacher.teacher_id
+                ).all()
+                for assignment in old_assignments:
+                    db_sess.query(TeacherSubjectLink).filter(
+                        TeacherSubjectLink.assignment_id == assignment.assignment_id
+                    ).delete()
+                    db_sess.delete(assignment)
 
-                if position_assignment:
-                    # Обновляем существующую запись
-                    if args.get('class_id') is not None:
-                        class_id = args['class_id']
-                        if class_id:
-                            class_exists = db_sess.query(Class).filter(Class.class_id == class_id).first()
-                            if not class_exists:
-                                logging.error(f"PATCH /api/admin/teacher/{teacher_id} - Class {class_id} not found")
-                                return {'description': f"Класс с ID {class_id} не найден."}, 400
-                        position_assignment.class_id = class_id if class_id else None
-                    if args.get('subject_id') is not None:
-                        position_assignment.subject_id = args['subject_id'] if args['subject_id'] else None
-                else:
-                    # Создаем новую запись
-                    class_id = args.get('class_id')
-                    if class_id:
-                        class_exists = db_sess.query(Class).filter(Class.class_id == class_id).first()
-                        if not class_exists:
-                            logging.error(f"PATCH /api/admin/teacher/{teacher_id} - Class {class_id} not found")
-                            return {'description': f"Класс с ID {class_id} не найден."}, 400
-                    subject_id = args.get('subject_id')
-                    new_assignment = TeacherPositionAssignment(
-                        teacher_id=teacher.teacher_id,
-                        position_id=args['position_id'],
-                        class_id=class_id,
-                        subject_id=subject_id
-                    )
-                    db_sess.add(new_assignment)
+                position_assignment = TeacherPositionAssignment(
+                    teacher_id=teacher.teacher_id,
+                    position_id=args['position_id']
+                )
+                db_sess.add(position_assignment)
+                db_sess.flush()
+
+                if 'subject_ids' in args and args['subject_ids'] is not None:
+                    subject_ids = args['subject_ids']
+                    for subject_id in subject_ids:
+                        try:
+                            subject_id = int(subject_id)
+                        except ValueError:
+                            return {'description': f'subject_id {subject_id} must be an integer'}, 400
+                        subject = db_sess.query(Subject).filter(Subject.subject_id == subject_id).first()
+                        if not subject:
+                            return {'description': f"Subject with ID {subject_id} not found"}, 400
+
+                    for subject_id in subject_ids:
+                        if subject_id:
+                            new_subject_link = TeacherSubjectLink(
+                                assignment_id=position_assignment.assignment_id,
+                                subject_id=subject_id
+                            )
+                            db_sess.add(new_subject_link)
+
+                    updated_fields['subject_ids'] = subject_ids
 
                 updated_fields['position_id'] = args['position_id']
-                if args.get('class_id') is not None:
-                    updated_fields['class_id'] = args['class_id']
-                if args.get('subject_id') is not None:
-                    updated_fields['subject_id'] = args['subject_id']
 
-            # Фиксируем изменения в базе данных
+            if not updated_fields:
+                return {'description': 'No fields to update'}, 400
+
             db_sess.commit()
             logging.info(f"PATCH /api/admin/teacher/{teacher_id} - Updated by user {username}: {updated_fields}")
-
             return {
                 'message': f'Данные учителя {teacher_id} успешно обновлены.',
                 'teacher_id': teacher.teacher_id,
@@ -473,7 +478,6 @@ class AdminOneTeacherAPI(Resource):
 
     @admin_authorization_required("/api/admin/teacher/<teacher_id>", method="DELETE")
     def delete(self, teacher_id, username=None):
-        """Удаление учителя по teacher_id."""
         db_sess = db_session.create_session()
         try:
             teacher = (db_sess.query(Teacher)
@@ -489,14 +493,24 @@ class AdminOneTeacherAPI(Resource):
                 logging.error(f"Teacher {teacher_id} has no associated User")
                 return {'description': "Ошибка: у учителя отсутствуют данные пользователя."}, 500
 
-            # Удаляем все записи из teacher_position_assignments для этого учителя
-            db_sess.query(TeacherPositionAssignment).filter(
-                TeacherPositionAssignment.teacher_id == teacher.teacher_id
-            ).delete()
+            schedules = db_sess.query(Schedule).filter(Schedule.teacher_id == teacher.teacher_id).count()
+            classes = db_sess.query(Class).filter(Class.teacher_id == teacher.teacher_id).count()
+            if schedules > 0 or classes > 0:
+                logging.info(
+                    f"DELETE /api/admin/teacher/{teacher_id} - Cannot delete: schedules={schedules}, classes={classes}")
+                return {
+                    'description': 'Нельзя удалить учителя, так как он связан с расписанием или классами.'
+                }, 400
 
-            # Удаляем учителя и связанного пользователя
-            db_sess.delete(teacher.user)  # Удаляем пользователя (каскадно удалит учителя, если настроено)
-            db_sess.delete(teacher)  # Удаляем учителя напрямую для надежности
+            assignments = db_sess.query(TeacherPositionAssignment).filter(
+                TeacherPositionAssignment.teacher_id == teacher.teacher_id).all()
+            for assignment in assignments:
+                db_sess.query(TeacherSubjectLink).filter(
+                    TeacherSubjectLink.assignment_id == assignment.assignment_id).delete()
+                db_sess.delete(assignment)
+
+            db_sess.delete(teacher.user)
+            db_sess.delete(teacher)
             db_sess.commit()
 
             logging.info(f"DELETE /api/admin/teacher/{teacher_id} - Deleted by user {username}")
@@ -513,20 +527,28 @@ class AdminOneTeacherAPI(Resource):
         finally:
             db_sess.close()
 
+
 class AdminAllTeachersAPI(Resource):
+    """Класс для api всех учителей"""
     @admin_authorization_required("/api/admin/teachers", method="GET")
-    def get(self, username=None):
-        """Получение списка всех учителей."""
+    def get(self, username=None, **filters):
         db_sess = db_session.create_session()
         try:
-            # Запрашиваем всех учителей с подгрузкой связанных данных
-            teachers = (db_sess.query(Teacher)
-                        .options(joinedload(Teacher.user))
-                        .options(joinedload(Teacher.classes))
-                        .options(joinedload(Teacher.schedules))
-                        .options(joinedload(Teacher.positions))
-                        .all())
+            query = (db_sess.query(Teacher)
+                     .options(joinedload(Teacher.user))
+                     .options(joinedload(Teacher.classes))
+                     .options(joinedload(Teacher.positions).joinedload(TeacherPositionAssignment.subject_links)))
 
+            if filters and 'search' in filters:
+                search_term = f"%{filters['search']}%"
+                query = query.join(User).filter(
+                    (User.first_name.ilike(search_term)) |
+                    (User.last_name.ilike(search_term)) |
+                    (func.concat(User.first_name, ' ', User.last_name).ilike(search_term))
+                )
+                logging.info(f"GET /api/admin/teachers - Search filter applied: {search_term}")
+
+            teachers = query.all()
             if not teachers:
                 logging.info(f"GET /api/admin/teachers - No teachers found by {username}")
                 return {
@@ -534,33 +556,23 @@ class AdminAllTeachersAPI(Resource):
                     'teachers': []
                 }, 200
 
-            # Формируем список учителей для ответа
             teachers_list = []
             for teacher in teachers:
-                classes = [
-                    {'class_id': cls.class_id, 'class_name': cls.class_name}
-                    for cls in teacher.classes
-                ]
-                schedules = [
-                    {
-                        'schedule_id': sched.schedule_id,
-                        'class_id': sched.class_id,
-                        'subject_id': sched.subject_id,
-                        'day_of_week': sched.day_of_week,
-                        'start_time': str(sched.start_time) if sched.start_time else None,
-                        'end_time': str(sched.end_time) if sched.end_time else None
-                    }
-                    for sched in teacher.schedules
-                ]
-                positions = [
-                    {
-                        'position_id': pos.position_id,
-                        'class_id': pos.class_id,
-                        'subject_id': pos.subject_id
-                    }
-                    for pos in teacher.positions
-                ]
-
+                if not teacher.user:
+                    logging.warning(f"Teacher {teacher.teacher_id} has no associated user")
+                    continue
+                classes = [{'class_id': cls.class_id, 'class_name': cls.class_name} for cls in teacher.classes]
+                positions = []
+                for pos in teacher.positions:
+                    subjects = [{
+                        'subject_id': link.subject.subject_id,
+                        'subject_name': link.subject.subject_name
+                    } for link in pos.subject_links if link.subject] if pos.subject_links else []
+                    positions.append({
+                        'position_id': pos.position.position_id,
+                        'position_name': pos.position.position_name,
+                        'subjects': subjects
+                    })
                 teacher_data = {
                     'teacher_id': teacher.teacher_id,
                     'user_id': teacher.user_id,
@@ -570,9 +582,7 @@ class AdminAllTeachersAPI(Resource):
                     'email': teacher.user.email if teacher.user else None,
                     'phone_number': teacher.user.phone_number if teacher.user else None,
                     'profile_picture': teacher.user.profile_picture if teacher.user else None,
-                    'api_key': teacher.user.api_key if teacher.user else None,
                     'classes': classes,
-                    'schedules': schedules,
                     'positions': positions
                 }
                 teachers_list.append(teacher_data)

@@ -3,7 +3,9 @@ from sqlalchemy import orm
 from sqlalchemy_serializer import SerializerMixin
 from .db_session import SqlAlchemyBase
 
+
 class Student(SqlAlchemyBase, SerializerMixin):
+    """Таблица для студентов"""
     __tablename__ = 'students'
 
     user_id = sqlalchemy.Column(sqlalchemy.Integer, sqlalchemy.ForeignKey("users.user_id"), primary_key=True)

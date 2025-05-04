@@ -8,11 +8,9 @@
 <div class="container mt-4">
     <h2 class="text-light mb-4">Редактирование учителя #{{ teacher.teacher_id }}</h2>
 
-    <!-- Форма редактирования -->
-    <form id="editTeacherForm" method="POST" enctype="multipart/form-data">
+    <form method="POST" enctype="multipart/form-data">
         {{ form.hidden_tag() }}
         <div class="row">
-            <!-- Левая колонка -->
             <div class="col-md-6">
                 <div class="mb-3">
                     {{ form.username.label(class="form-label text-light") }}
@@ -50,8 +48,6 @@
                     {% endfor %}
                 </div>
             </div>
-
-            <!-- Правая колонка -->
             <div class="col-md-6">
                 <div class="mb-3">
                     {{ form.phone_number.label(class="form-label text-light") }}
@@ -75,9 +71,9 @@
                     {% endfor %}
                 </div>
                 <div class="mb-3">
-                    {{ form.subject_id.label(class="form-label text-light") }}
-                    {{ form.subject_id(class="form-select") }}
-                    {% for error in form.subject_id.errors %}
+                    {{ form.subject_ids.label(class="form-label text-light") }}
+                    {{ form.subject_ids(class="form-select", multiple=True) }}
+                    {% for error in form.subject_ids.errors %}
                         <span class="text-danger">{{ error }}</span>
                     {% endfor %}
                 </div>
@@ -87,62 +83,15 @@
                     {% for error in form.profile_picture.errors %}
                         <span class="text-danger">{{ error }}</span>
                     {% endfor %}
-                    <div class="mt-2" style="width: 300px; height: 197px; overflow: hidden; position: relative;">
-                        <img id="profile_picture_preview" src="data:image/png;base64,{{ teacher.user.profile_picture }}" alt="Текущее фото" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); min-width: 300px; min-height: 197px; object-fit: cover;">
-                    </div>
+                    <img src="data:image/png;base64,{{ teacher.profile_picture }}" alt="Фото" class="mt-2" style="max-width: 200px;">
                 </div>
             </div>
         </div>
-
-        <!-- Кнопки -->
         <div class="d-flex justify-content-between">
             {{ form.submit(class="btn btn-primary") }}
-            <button type="button" class="btn btn-danger" id="deleteTeacherBtn">Удалить учителя</button>
-            <a href="/admin/teachers" class="btn btn-secondary">Отмена</a>
+            <a href="{{ url_for('admin.confirm_delete_teacher', teacher_id=teacher.teacher_id) }}" class="btn btn-danger">Удалить</a>
+            <a href="{{ url_for('admin.teachers') }}" class="btn btn-secondary">Отмена</a>
         </div>
     </form>
 </div>
-
-<!-- JavaScript для предпросмотра изображения и отправки форм через AJAX -->
-<script>
-// Обработка удаления учителя
-document.getElementById('deleteTeacherBtn').addEventListener('click', function() {
-    if (confirm('Вы уверены, что хотите удалить этого учителя? Это действие нельзя отменить.')) {
-        const teacherId = {{ teacher.teacher_id }};
-
-        fetch(`/admin/teacher/${teacherId}/delete`, {
-            method: 'POST',
-            credentials: 'include',  // Включаем cookies для сессионной авторизации
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'  // Указываем, что это AJAX-запрос
-            }
-        })
-        .then(response => {
-            if (!response.ok) {
-                if (response.status === 401 || response.status === 403) {
-                    // Если не авторизован, перенаправляем на страницу логина
-                    window.location.href = '/admin/login';
-                    return;
-                }
-                return response.json().then(data => {
-                    throw new Error(data.description || `HTTP error! Status: ${response.status}`);
-                });
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.redirect) {
-                window.location.href = data.redirect;
-            } else if (data.message) {
-                alert(data.message);  // Показываем сообщение об успешном удалении
-                window.location.href = '/admin/teachers';  // Перенаправляем вручную
-            }
-        })
-        .catch(error => {
-            console.error('Ошибка:', error);
-            alert('Произошла ошибка при удалении: ' + error.message);
-        });
-    }
-});
-</script>
 {% endblock %}

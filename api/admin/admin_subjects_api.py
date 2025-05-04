@@ -9,22 +9,20 @@ logging.basicConfig(
     filename='api_access.log',
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] - %(message)s',
-    encoding='utf-8'  # Добавляем кодировку для корректного отображения кириллицы
+    encoding='utf-8'
 )
 
 
 class AdminSubjectApi(Resource):
-    # Парсер для POST-запросов (уже есть)
+    """Класс для api одного предмета"""
     subject_pars = reqparse.RequestParser()
     subject_pars.add_argument('subject_name', type=str, required=True)
 
-    # Парсер для PATCH-запросов (добавляем)
     subject_patch = reqparse.RequestParser()
     subject_patch.add_argument('subject_name', type=str)
 
     @admin_authorization_required('api/admin/subject/<subject_id>', method='GET')
     def get(self, subject_id, username=None):
-        """Получение названия предмета по subject_id."""
         db_sess = db_session.create_session()
         try:
             subject = db_sess.query(Subject).filter(Subject.subject_id == subject_id).first()
@@ -50,12 +48,10 @@ class AdminSubjectApi(Resource):
 
     @admin_authorization_required('api/admin/subject', method='POST')
     def post(self, username=None, subject_name=None):
-        """Создание нового предмета."""
         db_sess = db_session.create_session()
         try:
-            # Обработка subject_name
             if subject_name is not None:
-                pass  # Уже передано через параметр
+                subject_name = subject_name['subject_name']
             else:
                 content_type = request.headers.get('Content-Type', '')
                 if 'multipart/form-data' in content_type:
@@ -63,15 +59,16 @@ class AdminSubjectApi(Resource):
                     if not subject_name:
                         return {'description': 'Field subject_name is required'}, 400
                 else:
-                    args = self.subject_pars.parse_args()
-                    subject_name = args['subject_name']
+                    try:
+                        args = self.subject_pars.parse_args()
+                        subject_name = args['subject_name']
+                    except Exception as e:
+                        return {'description': f'Validation error: {str(e)}'}, 400
 
-            # Проверка уникальности subject_name
             existing_subject = db_sess.query(Subject).filter(Subject.subject_name == subject_name).first()
             if existing_subject:
                 return {'description': f'Subject with name "{subject_name}" already exists'}, 400
 
-            # Создание нового предмета
             new_subject = Subject(subject_name=subject_name)
             db_sess.add(new_subject)
             db_sess.commit()
@@ -95,7 +92,6 @@ class AdminSubjectApi(Resource):
 
     @admin_authorization_required('api/admin/subject/<subject_id>', method='PATCH')
     def patch(self, subject_id, username=None, update_data=None):
-        """Обновление предмета по subject_id."""
         db_sess = db_session.create_session()
         try:
             subject = db_sess.query(Subject).filter(Subject.subject_id == subject_id).first()
@@ -103,11 +99,9 @@ class AdminSubjectApi(Resource):
                 logging.error(f'PATCH /api/admin/subject/{subject_id} - Not found for user {username}')
                 return {'description': f'Предмет с id {subject_id} не найден.'}, 404
 
-            # Если update_data передано (например, из маршрута), используем его
             if update_data is not None:
                 args = update_data
             else:
-                # Иначе проверяем Content-Type и обрабатываем запрос
                 content_type = request.headers.get('Content-Type', '')
                 if 'application/json' in content_type:
                     args = self.subject_patch.parse_args()
@@ -116,11 +110,11 @@ class AdminSubjectApi(Resource):
                     if 'subject_name' in request.form:
                         args['subject_name'] = request.form['subject_name']
                 else:
-                    return {'description': "Unsupported Content-Type. Use 'application/json' or 'multipart/form-data'."}, 415
+                    return {
+                        'description': "Unsupported Content-Type. Use 'application/json' or 'multipart/form-data'."}, 415
 
             updated_fields = {}
             if args.get('subject_name') is not None:
-                # Проверяем уникальность нового названия
                 existing_subject = db_sess.query(Subject).filter(
                     Subject.subject_name == args['subject_name'],
                     Subject.subject_id != subject_id
@@ -130,7 +124,6 @@ class AdminSubjectApi(Resource):
                 subject.subject_name = args['subject_name']
                 updated_fields['subject_name'] = subject.subject_name
 
-            # Если ничего не обновлено, возвращаем сообщение
             if not updated_fields:
                 return {'description': 'No fields to update'}, 400
 
@@ -152,7 +145,6 @@ class AdminSubjectApi(Resource):
 
     @admin_authorization_required('api/admin/subject/<subject_id>', method='DELETE')
     def delete(self, subject_id, username=None):
-        """Удаление предмета по id."""
         db_sess = db_session.create_session()
         try:
             subject = db_sess.query(Subject).filter(Subject.subject_id == subject_id).first()
@@ -160,9 +152,9 @@ class AdminSubjectApi(Resource):
                 logging.error(f'DELETE /api/admin/subject/{subject_id} - Not found for user {username}')
                 return {'description': f'Предмет {subject_id} не найден'}, 404
 
-            # Проверка связанных данных
             if subject.grades or subject.homeworks:
-                return {'description': 'Нельзя удалить предмет, так как он связан с оценками или домашними заданиями.'}, 400
+                return {
+                    'description': 'Нельзя удалить предмет, так как он связан с оценками или домашними заданиями.'}, 400
 
             db_sess.delete(subject)
             db_sess.commit()
@@ -183,9 +175,9 @@ class AdminSubjectApi(Resource):
 
 
 class AdminSubjectsApi(Resource):
+    """Класс для api всех предметов"""
     @admin_authorization_required('api/admin/subjects', method='GET')
     def get(self, username=None):
-        """Получение списка всех предметов."""
         db_sess = db_session.create_session()
         try:
             subjects = db_sess.query(Subject).all()
