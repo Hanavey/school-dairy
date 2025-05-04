@@ -1,7 +1,7 @@
 from flask import render_template, redirect, url_for
 from flask_login import login_required, current_user, login_user, logout_user
 from student import student_bp
-from forms.students_login import LoginForm
+from forms.login import LoginForm
 from data import db_session
 from data.user import User
 from data.student import Student
