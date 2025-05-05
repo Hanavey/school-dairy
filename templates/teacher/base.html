@@ -15,16 +15,16 @@
                 <div class="navbar-nav me-auto">
                     {% if current_user.is_authenticated %}
                         <nav class="navbar navbar-dark bg-dark">
-                            <a class="navbar-brand" href="/admin/logout">
+                            <a class="navbar-brand" href="/teacher/logout">
                                 <img src="data:image/png;base64, {{ current_user.profile_picture }}" alt="" class="rounded-circle" width="40" height="40">
                                 {{ current_user.first_name }} {{ current_user.last_name }}
                             </a>
                         </nav>
                     {% endif %}
                 </div>
-                <a class="navbar-brand mx-auto" href="/admin">Админ-панель</a>
+                <a class="navbar-brand mx-auto" href="/teacher">Учительская</a>
                 {% if not current_user.is_authenticated %}
-                    <a class="btn btn-primary" href="/admin/login">Вход</a>
+                    <a class="btn btn-primary" href="/teacher/login">Вход</a>
                 {% endif %}
             </div>
         </nav>
@@ -36,11 +36,10 @@
                         <div class="card-body">
                             <h5 class="card-title">Меню</h5>
                             <ul class="list-group w-100">
-                                <li class="list-group-item"><a href=#>Классы</a></li>
-                                <li class="list-group-item"><a href=#>Учителя</a></li>
-                                <li class="list-group-item"><a href=#>Расписание</a></li>
-                                <li class="list-group-item"><a href=#>Предметы</a></li>
-                                <li class="list-group-item"><a href=#>Настройки профиля</a></li>
+                                <li class="list-group-item"><a href="#">Ведомые классы</a></li>
+                                <li class="list-group-item"><a href="#">Ваш класс</a></li>
+                                <li class="list-group-item"><a href="#">Ваше расписание</a></li>
+                                <li class="list-group-item"><a href="/teacher/settings">Настройки профиля</a></li>
                             </ul>
                         </div>
                     </div>
@@ -57,7 +56,7 @@
 
         <footer class="footer mt-auto">
             <div class="container">
-                <p class="mb-0">&copy; 2025 Школьный дневник | Ученик</p>
+                <p class="mb-0">&copy; 2025 Школьный дневник | Учительская</p>
             </div>
         </footer>
     </div>

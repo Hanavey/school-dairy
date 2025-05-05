@@ -227,7 +227,7 @@ def test_admin_all_schedules():
          lambda: requests.get(f"{BASE_URL}/api/admin/schedules?subject=Математика", headers=headers_valid)),
         ("AdminAllSchedulesAPI - Valid (Filter by day 'Понедельник')",
          lambda: requests.get(f"{BASE_URL}/api/admin/schedules?day=Понедельник", headers=headers_valid)),
-        ("AdminAllSchedulesAPI - Valid (Filter by time '09:00')",
+        ("AdminAllSchedulesAPI - Valid (Filter by time '09-00')",
          lambda: requests.get(f"{BASE_URL}/api/admin/schedules?time=09:00", headers=headers_valid)),
         ("AdminAllSchedulesAPI - Invalid API Key",
          lambda: requests.get(f"{BASE_URL}/api/admin/schedules", headers=headers_invalid)),
