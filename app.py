@@ -24,9 +24,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db_session.global_init("db/school_diary.db")
 
-# Инициализация Flask-Migrate
-# Мы передаём только app, а движок и metadata настроим в migrations/env.py
-migrate = Migrate(app, db_session.get_engine(), render_as_batch=True)  # render_as_batch=True для SQLite
+migrate = Migrate(app, db_session.get_engine(), render_as_batch=True)
 
 # Инициализация Flask-Login
 login_manager = LoginManager()

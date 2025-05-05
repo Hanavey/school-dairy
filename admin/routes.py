@@ -733,6 +733,30 @@ def settings():
     return render_template('admin/settings.html', form=form)
 
 
+@admin_bp.route('/generate_api_key', methods=['POST'])
+@blueprint_login_required('admin_bp')
+def generate_api_key():
+    """Генерация API-ключа для администратора."""
+    db_sess = db_session.create_session()
+    try:
+        user = db_sess.query(User).filter(User.user_id == current_user.user_id).first()
+        if not user:
+            flash('Пользователь не найден.', 'danger')
+            return redirect(url_for('admin.settings'))
+
+        api_key = user.generate_api_key()
+        db_sess.commit()
+        logging.info(f"API key generated for admin user_id={user.user_id}")
+        return render_template('admin/settings.html', form=UserSettingsForm(), api_key=api_key)
+    except Exception as e:
+        db_sess.rollback()
+        logging.error(f"Error generating API key for admin user_id={current_user.user_id}: {str(e)}")
+        flash(f'Ошибка при генерации API-ключа: {str(e)}', 'danger')
+        return redirect(url_for('admin.settings'))
+    finally:
+        db_sess.close()
+
+
 @admin_bp.route('/login', methods=['GET', 'POST'])
 def login():
     """Страница регистрации администратора"""

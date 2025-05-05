@@ -1,4 +1,4 @@
-from flask import render_template, redirect
+from flask import render_template, redirect, flash, url_for
 from flask_login import current_user, login_user, logout_user
 from teacher import teacher_bp
 from data import db_session
@@ -9,6 +9,14 @@ from forms.login import LoginForm
 from data.teacher import Teacher
 from data.user import User
 import base64
+import logging
+
+
+logging.basicConfig(
+    filename='routes.log',
+    level=logging.DEBUG,
+    format='%(asctime)s [%(levelname)s] - %(message)s'
+)
 
 
 @teacher_bp.route('/')
@@ -59,6 +67,30 @@ def settings():
     form.phone_number.data = user_data['phone_number']
 
     return render_template('teacher/settings.html', form=form)
+
+
+@teacher_bp.route('/generate_api_key', methods=['POST'])
+@blueprint_login_required('teacher_bp')
+def generate_api_key():
+    """Генерация API-ключа для учителя."""
+    db_sess = db_session.create_session()
+    try:
+        user = db_sess.query(User).filter(User.user_id == current_user.user_id).first()
+        if not user:
+            flash('Пользователь не найден.', 'danger')
+            return redirect(url_for('teacher.settings'))
+
+        api_key = user.generate_api_key()
+        db_sess.commit()
+        logging.info(f"API key generated for teacher user_id={user.user_id}")
+        return render_template('teacher/settings.html', form=UserSettingsForm(), api_key=api_key)
+    except Exception as e:
+        db_sess.rollback()
+        logging.error(f"Error generating API key for teacher user_id={current_user.user_id}: {str(e)}")
+        flash(f'Ошибка при генерации API-ключа: {str(e)}', 'danger')
+        return redirect(url_for('teacher.settings'))
+    finally:
+        db_sess.close()
 
 
 @teacher_bp.route('/login', methods=['GET', 'POST'])
