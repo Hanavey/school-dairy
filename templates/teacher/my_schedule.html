@@ -1,0 +1,46 @@
+<!-- templates/teacher/my_schedule.html -->
+{% extends "teacher/base.html" %}
+
+{% block title %}Мое расписание{% endblock %}
+
+{% block content %}
+<h1>Мое расписание</h1>
+
+<div class="mb-3">
+    <a href="{{ url_for('teacher.my_schedule_excel') }}" class="btn btn-primary">
+        Скачать расписание в Excel
+    </a>
+</div>
+
+{% if schedule %}
+    {% set days = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'] %}
+    {% for day in days %}
+        {% set day_schedule = schedule | selectattr('day_of_week', 'equalto', day) | list %}
+        {% if day_schedule %}
+            <h3>{{ day }}</h3>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Класс</th>
+                        <th>Предмет</th>
+                        <th>Время начала</th>
+                        <th>Время окончания</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in day_schedule %}
+                    <tr>
+                        <td>{{ s.class_name }}</td>
+                        <td>{{ s.subject_name }}</td>
+                        <td>{{ s.start_time }}</td>
+                        <td>{{ s.end_time }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    {% endfor %}
+{% else %}
+    <p>Расписание не задано.</p>
+{% endif %}
+{% endblock %}

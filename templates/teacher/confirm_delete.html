@@ -1,0 +1,28 @@
+{% extends "teacher/base.html" %}
+
+{% block title %}
+    Подтверждение удаления
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">Подтверждение удаления</h2>
+    <p>Вы уверены, что хотите удалить класс "{{ class_name }}" (ID: {{ id }})? Это действие нельзя отменить.</p>
+
+    <form method="POST" action="{{ delete_url }}">
+        {{ form.hidden_tag() if form else '' }}
+        <div class="d-flex justify-content-between">
+            <button type="submit" class="btn btn-danger">Удалить</button>
+            <a href="{{ list_url }}" class="btn btn-secondary">Отмена</a>
+        </div>
+    </form>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} mt-3">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+</div>
+{% endblock %}

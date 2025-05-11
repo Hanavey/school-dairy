@@ -1,0 +1,31 @@
+{% extends "student/base.html" %}
+
+{% block title %}Одноклассники{% endblock %}
+
+{% block content %}
+<h2>Одноклассники (Класс ID: {{ class_id }})</h2>
+{% if classmates %}
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Имя</th>
+                <th>Фамилия</th>
+                <th>Телефон</th>
+                <th>Email</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in classmates %}
+                <tr>
+                    <td>{{ c.first_name }}</td>
+                    <td>{{ c.last_name }}</td>
+                    <td>{{ c.phone_number or 'Не указан' }}</td>
+                    <td>{{ c.email or 'Не указан' }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p class="text-muted">Одноклассники отсутствуют.</p>
+{% endif %}
+{% endblock %}

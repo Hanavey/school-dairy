@@ -1,0 +1,308 @@
+<!-- templates/teacher/class_management.html -->
+{% extends "teacher/base.html" %}
+
+{% block title %}Класс {{ class_id }} - {{ subject_name }}{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Класс {{ class_id }} - {{ subject_name }}</h1>
+
+<!-- Кнопка для скачивания Excel-файла -->
+<div class="mb-3">
+    <a href="/teacher/class/{{ class_id }}/{{ subject_id }}/excel_report" class="btn btn-primary">
+        Скачать отчет в Excel
+    </a>
+</div>
+
+<!-- Таблица оценок и посещаемости -->
+<h2 class="mb-3">Оценки и посещаемость</h2>
+<div class="table-responsive">
+    <table class="table table-bordered table-hover">
+        <thead class="table-dark">
+            <tr>
+                <th>Студент</th>
+                {% for date in attendance|map(attribute='date')|unique %}
+                    <th>{{ date }}</th>
+                {% endfor %}
+                <th>
+                    <button class="btn btn-primary btn-sm" onclick="addAttendanceColumn()">Добавить дату</button>
+                </th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for student in students %}
+                <tr>
+                    <td>{{ student.full_name }}</td>
+                    {% for date in attendance|map(attribute='date')|unique %}
+                        <td>
+                            <!-- Оценка -->
+                            {% set grade = grades|selectattr('student_id', 'equalto', student.user_id)|selectattr('date', 'equalto', date)|first %}
+                            {% if grade %}
+                                <span class="badge bg-primary editable" onclick="editGrade('{{ grade.grade_id }}', '{{ student.user_id }}', '{{ date }}', '{{ grade.grade }}')">
+                                    {{ grade.grade }}
+                                </span>
+                                <i class="bi bi-trash text-danger ms-2" onclick="deleteGrade('{{ grade.grade_id }}')" style="cursor: pointer;"></i>
+                            {% else %}
+                                <span class="badge bg-secondary editable" onclick="addGrade('{{ student.user_id }}', '{{ date }}')">-</span>
+                            {% endif %}
+                            <br>
+                            <!-- Посещаемость -->
+                            {% set att = attendance|selectattr('student_id', 'equalto', student.user_id)|selectattr('date', 'equalto', date)|first %}
+                            {% if att %}
+                                <span class="badge {% if att.status == 'присутствовал' %}bg-success{% else %}bg-danger{% endif %} editable"
+                                      onclick="editAttendance('{{ att.attendance_id }}', '{{ student.user_id }}', '{{ date }}', '{{ att.status }}')">
+                                    {{ att.status }}
+                                </span>
+                            {% endif %}
+                        </td>
+                    {% endfor %}
+                    <td></td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Форма для добавления ДЗ -->
+<div class="card mt-4">
+    <div class="card-body">
+        <h2 class="card-title mb-3">Добавить домашнее задание</h2>
+        <form id="homeworkForm">
+            <div class="mb-3">
+                <label for="task" class="form-label">Задание:</label>
+                <textarea class="form-control" id="task" name="task" rows="4" required></textarea>
+            </div>
+            <div class="mb-3">
+                <label for="due_date" class="form-label">Срок сдачи:</label>
+                <input type="date" class="form-control" id="due_date" name="due_date" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Добавить ДЗ</button>
+        </form>
+    </div>
+</div>
+
+<!-- Список ДЗ -->
+<div class="mt-4">
+    <h2>Домашние задания</h2>
+    {% if homeworks %}
+        <ul class="list-group">
+            {% for hw in homeworks %}
+                <li class="list-group-item" style="color: white">
+                    {{ hw.task }} (Срок: {{ hw.due_date }})
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+</div>
+
+<!-- Модальное окно для добавления даты -->
+<div class="modal fade" id="addDateModal" tabindex="-1" aria-labelledby="addDateModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addDateModalLabel">Добавить дату</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <label for="datePicker" class="form-label">Выберите дату:</label>
+                <input type="text" class="form-control" id="datePicker" required>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="submitDate()">Добавить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для редактирования посещаемости -->
+<div class="modal fade" id="editAttendanceModal" tabindex="-1" aria-labelledby="editAttendanceModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editAttendanceModalLabel">Изменить статус посещаемости</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <label for="statusSelect" class="form-label">Выберите статус:</label>
+                <select class="form-select" id="statusSelect" required>
+                    <option value="присутствовал">Присутствовал</option>
+                    <option value="отсутствовал">Отсутствовал</option>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="submitAttendance()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Подключение flatpickr CSS и JS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    // Глобальные переменные для хранения данных посещаемости
+    let currentAttendanceId, currentStudentId, currentDate;
+
+    // Инициализация flatpickr для поля выбора даты
+    function initializeDatePicker() {
+        flatpickr("#datePicker", {
+            dateFormat: "Y-m-d", // Формат YYYY-MM-DD
+            defaultDate: new Date(), // Сегодняшняя дата по умолчанию
+            maxDate: new Date().setDate(new Date().getDate() + 30), // Максимум 30 дней вперед
+            locale: {
+                firstDayOfWeek: 1 // Начало недели - понедельник
+            }
+        });
+    }
+
+    // Открытие модального окна для добавления даты
+    function addAttendanceColumn() {
+        initializeDatePicker();
+        $('#addDateModal').modal('show');
+    }
+
+    // Отправка выбранной даты
+    function submitDate() {
+        const date = $('#datePicker').val();
+        if (date) {
+            $.post({
+                url: "/teacher/class/{{ class_id }}/{{ subject_id }}",
+                data: {
+                    action: 'add_attendance',
+                    date: date
+                },
+                success: function(response) {
+                    if (response.status === 'success') {
+                        location.reload();
+                    } else {
+                        alert(response.description);
+                    }
+                    $('#addDateModal').modal('hide');
+                }
+            });
+        } else {
+            alert("Пожалуйста, выберите дату.");
+        }
+    }
+
+    // Открытие модального окна для редактирования посещаемости
+    function editAttendance(attendance_id, student_id, date, current_status) {
+        currentAttendanceId = attendance_id;
+        currentStudentId = student_id;
+        currentDate = date;
+        $('#statusSelect').val(current_status);
+        $('#editAttendanceModal').modal('show');
+    }
+
+    // Отправка выбранного статуса посещаемости
+    function submitAttendance() {
+        const status = $('#statusSelect').val();
+        if (status) {
+            $.post({
+                url: "/teacher/class/{{ class_id }}/{{ subject_id }}",
+                data: {
+                    action: 'update_attendance',
+                    attendance_id: currentAttendanceId,
+                    student_id: currentStudentId,
+                    date: currentDate,
+                    status: status
+                },
+                success: function(response) {
+                    if (response.status === 'success') {
+                        location.reload();
+                    } else {
+                        alert(response.description);
+                    }
+                    $('#editAttendanceModal').modal('hide');
+                }
+            });
+        }
+    }
+
+    function addGrade(student_id, date) {
+        let grade = prompt("Введите оценку (2-5):");
+        if (grade && parseInt(grade) >= 2 && parseInt(grade) <= 5) {
+            $.post({
+                url: "/teacher/class/{{ class_id }}/{{ subject_id }}",
+                data: {
+                    action: 'add_grade',
+                    student_id: student_id,
+                    grade: grade,
+                    date: date
+                },
+                success: function(response) {
+                    if (response.status === 'success') {
+                        location.reload();
+                    } else {
+                        alert(response.description);
+                    }
+                }
+            });
+        }
+    }
+
+    function editGrade(grade_id, student_id, date, current_grade) {
+        let grade = prompt("Измените оценку (2-5):", current_grade);
+        if (grade && parseInt(grade) >= 2 && parseInt(grade) <= 5) {
+            $.post({
+                url: "/teacher/class/{{ class_id }}/{{ subject_id }}",
+                data: {
+                    action: 'update_grade',
+                    grade_id: grade_id,
+                    student_id: student_id,
+                    grade: grade,
+                    date: date
+                },
+                success: function(response) {
+                    if (response.status === 'success') {
+                        location.reload();
+                    } else {
+                        alert(response.description);
+                    }
+                }
+            });
+        }
+    }
+
+    function deleteGrade(grade_id) {
+        if (confirm("Удалить оценку?")) {
+            $.post({
+                url: "/teacher/class/{{ class_id }}/{{ subject_id }}",
+                data: {
+                    action: 'delete_grade',
+                    grade_id: grade_id
+                },
+                success: function(response) {
+                    if (response.status === 'success') {
+                        location.reload();
+                    } else {
+                        alert(response.description);
+                    }
+                }
+            });
+        }
+    }
+
+    $('#homeworkForm').submit(function(e) {
+        e.preventDefault();
+        $.post({
+            url: "/teacher/class/{{ class_id }}/{{ subject_id }}",
+            data: {
+                action: 'add_homework',
+                task: $('#task').val(),
+                due_date: $('#due_date').val()
+            },
+            success: function(response) {
+                if (response.status === 'success') {
+                    location.reload();
+                } else {
+                    alert(response.description);
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

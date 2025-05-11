@@ -1,0 +1,20 @@
+{% extends "student/base.html" %}
+
+{% block title %}Выбор предмета{% endblock %}
+
+{% block content %}
+<h2>Выберите предмет</h2>
+{% if subjects %}
+    <ul class="list-group">
+        {% for subject in subjects %}
+            <li class="list-group-item">
+                <a href="{{ url_for('student.grades_attendance', subject_id=subject.subject_id) }}">
+                    {{ subject.subject_name }}
+                </a>
+            </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p class="text-muted">Предметы отсутствуют.</p>
+{% endif %}
+{% endblock %}

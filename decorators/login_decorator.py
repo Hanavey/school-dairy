@@ -11,8 +11,10 @@ def blueprint_login_required(bp_name):
             if not current_user.is_authenticated:
                 if bp_name == 'admin_bp':
                     return redirect(url_for('admin.login'))
-                elif bp_name == 'student_bp':
-                    return redirect(url_for('student.login'))
+                elif bp_name == 'teacher_bp':
+                    return redirect(url_for('teacher.login'))
+                elif bp_name == 'students_bp':
+                    return redirect(url_for('students.login'))
             return f(*args, **kwargs)
         return decorated_function
     return decorator

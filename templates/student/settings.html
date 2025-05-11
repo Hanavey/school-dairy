@@ -1,0 +1,36 @@
+{% extends "student/base.html" %}
+
+{% block content %}
+<h1>Настройки профиля</h1>
+{% if message %}
+<p class="text-danger">{{ message }}</p>
+{% endif %}
+{% if api_key %}
+<p class="text-success">Ваш API-ключ: <code>{{ api_key }}</code></p>
+{% endif %}
+<form method="POST" enctype="multipart/form-data">
+    {{ form.hidden_tag() }}
+    <div class="form-group mb-3">
+        {{ form.first_name.label }} {{ form.first_name(class="form-control") }}
+    </div>
+    <div class="form-group mb-3">
+        {{ form.last_name.label }} {{ form.last_name(class="form-control") }}
+    </div>
+    <div class="form-group mb-3">
+        {{ form.email.label }} {{ form.email(class="form-control") }}
+    </div>
+    <div class="form-group mb-3">
+        {{ form.phone_number.label }} {{ form.phone_number(class="form-control") }}
+    </div>
+    <div class="form-group mb-3">
+        {{ form.profile_picture.label }} {{ form.profile_picture(class="form-control") }}
+    </div>
+    <div class="form-group mb-3">
+        {{ form.password.label }} {{ form.password(class="form-control") }}
+    </div>
+    {{ form.submit(class="btn btn-primary") }}
+</form>
+<form method="POST" action="{{ url_for('student.generate_api_key') }}">
+    <button type="submit" class="btn btn-secondary mt-3">Получить API-ключ</button>
+</form>
+{% endblock %}

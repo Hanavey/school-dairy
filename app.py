@@ -13,7 +13,19 @@ from api.admin.admin_schedules_api import AdminOneScheduleAPI, AdminAllSchedules
 from api.admin.admin_subjects_api import AdminSubjectApi, AdminSubjectsApi
 from api.admin.admin_excel_files import (AdminStudentsExcelFile, AdminTeachersExcelFile, AdminSubjectsExcelFile,
                                          AdminScheduleExcelFile)
+from api.teacher.teacher_classes_api import TeacherClassesAPI
+from api.teacher.teacher_list_api import TeacherListAPI
 from api.user_settings_api import UserSettingsAPI
+from api.teacher.class_teacher_api import ClassTeacherResource
+from api.teacher.teacher_excel_files import ClassExcelReportResource, ClassFullReportResource, TeacherScheduleExcelResource
+from api.teacher.teacher_grades_homework_attendance_api import GradeResource, AttendanceResource, HomeworkResource
+from api.teacher.teacher_schedule_api import TeacherScheduleResource
+from api.teacher.teacher_subjects_api import TeacherSubjectsAPI
+from api.students.students_api import (StudentHomeworkResource, StudentScheduleResource,
+                                       StudentGradesAttendanceResource, ClassmatesResource)
+from forms.adress_form import AddressSearchForm
+import urllib
+import requests
 
 
 app = Flask(__name__)
@@ -56,11 +68,68 @@ api.add_resource(AdminTeachersExcelFile, '/api/admin/teachers/excel/<string:sear
 api.add_resource(AdminScheduleExcelFile, '/api/admin/schedules/excel')
 api.add_resource(AdminSubjectsExcelFile, '/api/admin/subjects/excel')
 
+api.add_resource(TeacherClassesAPI, '/api/teachers/classes', '/api/teachers/classes/<int:class_id>')
+api.add_resource(TeacherListAPI, '/api/teachers/free-teachers')
+api.add_resource(ClassTeacherResource, '/api/teachers/my-class')
+api.add_resource(GradeResource, '/api/teachers/classes/<int:class_id>/grades', '/api/teachers/grades', '/api/teachers/grades/<int:grade_id>')
+api.add_resource(HomeworkResource, '/api/teachers/classes/<int:class_id>/homework', '/api/teachers/homework')
+api.add_resource(AttendanceResource, '/api/teachers/classes/<int:class_id>/attendance', '/api/teachers/attendance')
+api.add_resource(TeacherScheduleResource, '/api/teachers/schedule')
+api.add_resource(TeacherSubjectsAPI, '/api/teachers/classes/<int:class_id>/subjects')
+api.add_resource(ClassExcelReportResource, '/api/teachers/classes/<int:class_id>/<int:subject_id>/excel')
+api.add_resource(ClassFullReportResource, '/api/teachers/my-class/excel')
+api.add_resource(TeacherScheduleExcelResource, '/api/teachers/schedule/excel')
+
+api.add_resource(StudentScheduleResource, '/api/student/schedule')
+api.add_resource(StudentGradesAttendanceResource, '/api/student/grades_attendance/<int:subject_id>')
+api.add_resource(StudentHomeworkResource, '/api/student/homework')
+api.add_resource(ClassmatesResource, '/api/student/classmates')
+
 
 # Простая главная страница (опционально)
-@app.route('/')
+@app.route('/', methods=['GET', 'POST'])
 def index():
-    return "Добро пожаловать в школьный дневник! Выберите приложение: <a href='/student'>Для учеников</a> | <a href='/teacher'>Для учителей</a>"
+    # Инициализация формы
+    form = AddressSearchForm()
+
+    # Параметры по умолчанию для карты
+    default_center = '37.6173,55.7558'  # Москва
+    default_address = 'Москва, центр'
+    default_coords = default_center
+    map_url = f"https://static-maps.yandex.ru/1.x/?ll={default_center}&z=15&l=map&size=600,400&pt={default_center},pm2rdm&apikey=ВАШ_API_КЛЮЧ"
+
+    # Обработка формы
+    if form.validate_on_submit():
+        address = form.address.data
+        try:
+            # Запрос к Яндекс.Геокодеру
+            geocoder_url = f"https://geocode-maps.yandex.ru/1.x/?apikey=191ba092-d250-414d-b5ec-bf6ac8d9a224&geocode={urllib.parse.quote(address)}&format=json"
+            response = requests.get(geocoder_url)
+            response.raise_for_status()
+            geocoder_data = response.json()
+
+            # Извлечение координат и адреса
+            feature = geocoder_data['response']['GeoObjectCollection']['featureMember']
+            if feature:
+                point = feature[0]['GeoObject']['Point']['pos']  # Формат: "долгота широта"
+                longitude, latitude = point.split()
+                default_coords = f"{longitude},{latitude}"
+                default_address = feature[0]['GeoObject']['metaDataProperty']['GeocoderMetaData']['text']
+
+                # Генерация URL для статической карты
+                map_url = f"https://static-maps.yandex.ru/1.x/?ll={default_coords}&z=15&l=map&size=600,400&pt={default_coords},pm2rdm&apikey=81b63ec7-b5bf-4e94-97fd-5645a56b1305"
+            else:
+                default_address = "Адрес не найден"
+        except Exception as e:
+            default_address = f"Ошибка при поиске адреса: {str(e)}"
+
+    return render_template(
+        'index.html',
+        form=form,
+        map_url=map_url,
+        address=default_address,
+        coords=default_coords
+    )
 
 
 @app.errorhandler(404)

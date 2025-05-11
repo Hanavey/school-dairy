@@ -1,0 +1,30 @@
+{% extends "teacher/base.html" %}
+
+{% block title %}
+	Выбор предмета
+{% endblock %}
+
+
+{% block content %}
+    <div class="row">
+        <h2 class="mb-4">Выберите предмет</h2>
+
+        {% for subject in subjects %}
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">{{ subject[1] }}</h5>
+                    <p class="card-text">ID предмета: {{ subject[0] }}</p>
+                    <a href="/teacher/class/{{ class_id }}/{{ subject[0] }}" class="btn btn-primary">Выбрать</a>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="col-12">
+            <div class="alert alert-info" role="alert">
+                Список предметов пуст
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% endblock %}

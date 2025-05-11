@@ -1,0 +1,33 @@
+{% extends "student/base.html" %}
+
+{% block title %}Расписание{% endblock %}
+
+{% block content %}
+<h2>Расписание уроков (Класс ID: {{ class_id }})</h2>
+{% if schedule %}
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Предмет</th>
+                <th>Учитель</th>
+                <th>День недели</th>
+                <th>Время начала</th>
+                <th>Время окончания</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in schedule %}
+                <tr>
+                    <td>{{ s.subject_name }}</td>
+                    <td>{{ s.teacher_name }}</td>
+                    <td>{{ s.day_of_week }}</td>
+                    <td>{{ s.start_time }}</td>
+                    <td>{{ s.end_time }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p class="text-muted">Расписание отсутствует.</p>
+{% endif %}
+{% endblock %}

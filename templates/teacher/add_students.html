@@ -1,0 +1,79 @@
+{% extends "teacher/base.html" %}
+
+{% block title %}Добавить учеников в класс{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">Добавить учеников в класс {{ class_name }} (ID: {{ class_id }})</h2>
+
+    {% if message %}
+    <div class="alert alert-{{ 'success' if status == 'success' else 'danger' }}">{{ message }}</div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('teacher.add_students', class_id=class_id) }}">
+                {{ form.hidden_tag() }}
+                <div class="mb-3">
+                    {{ form.username.label(class="form-label") }}
+                    {{ form.username(class="form-control", placeholder="Введите имя пользователя") }}
+                    {% for error in form.username.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ form.first_name.label(class="form-label") }}
+                    {{ form.first_name(class="form-control", placeholder="Введите имя") }}
+                    {% for error in form.first_name.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ form.last_name.label(class="form-label") }}
+                    {{ form.last_name(class="form-control", placeholder="Введите фамилию") }}
+                    {% for error in form.last_name.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ form.email.label(class="form-label") }}
+                    {{ form.email(class="form-control", placeholder="Введите email") }}
+                    {% for error in form.email.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ form.password.label(class="form-label") }}
+                    {{ form.password(class="form-control", placeholder="Введите пароль") }}
+                    {% for error in form.password.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ form.birth_date.label(class="form-label") }}
+                    {{ form.birth_date(class="form-control", placeholder="YYYY-MM-DD") }}
+                    {% for error in form.birth_date.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ form.phone_number.label(class="form-label") }}
+                    {{ form.phone_number(class="form-control", placeholder="Введите номер телефона") }}
+                    {% for error in form.phone_number.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ form.address.label(class="form-label") }}
+                    {{ form.address(class="form-control", placeholder="Введите адрес") }}
+                    {% for error in form.address.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                {{ form.submit(class="btn btn-primary") }}
+                <a href="{{ url_for('teacher.classes') }}" class="btn btn-secondary">Отмена</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

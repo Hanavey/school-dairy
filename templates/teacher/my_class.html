@@ -1,0 +1,94 @@
+<!-- templates/teacher/my_class.html -->
+{% extends "teacher/base.html" %}
+
+{% block title %}Мой класс - {{ class_name }}{% endblock %}
+
+{% block content %}
+<h1>Мой класс: {{ class_name }}</h1>
+
+<div class="mb-3">
+    <a href="{{ url_for('teacher.my_class_full_report') }}" class="btn btn-success">
+        Скачать полный отчет по классу в Excel
+    </a>
+</div>
+
+<h2>Ученики</h2>
+{% if students %}
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>ФИО</th>
+            <th>Дата рождения</th>
+            <th>Адрес</th>
+            <th>Email</th>
+            <th>Телефон</th>
+            <th>Оценки</th>
+            <th>Посещаемость</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for student in students %}
+        <tr>
+            <td>{{ student.first_name }} {{ student.last_name }}</td>
+            <td>{{ student.birth_date or 'Не указано' }}</td>
+            <td>{{ student.address or 'Не указано' }}</td>
+            <td>{{ student.email or 'Не указано' }}</td>
+            <td>{{ student.phone_number or 'Не указано' }}</td>
+            <td>
+                {% if student.grades %}
+                <ul>
+                    {% for grade in student.grades %}
+                    <li>{{ grade.subject_name }}: {{ grade.grade }} ({{ grade.date }})</li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                Нет оценок
+                {% endif %}
+            </td>
+            <td>
+                {% if student.attendance %}
+                <ul>
+                    {% for record in student.attendance %}
+                    <li>{{ record.date }}: {{ record.status }}</li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                Нет записей
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>В классе нет учеников.</p>
+{% endif %}
+
+<h2>Расписание</h2>
+{% if schedule %}
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>День недели</th>
+            <th>Предмет</th>
+            <th>Учитель</th>
+            <th>Время начала</th>
+            <th>Время окончания</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for s in schedule %}
+        <tr>
+            <td>{{ s.day_of_week }}</td>
+            <td>{{ s.subject_name }}</td>
+            <td>{{ s.teacher_name }}</td>
+            <td>{{ s.start_time }}</td>
+            <td>{{ s.end_time }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>Расписание не задано.</p>
+{% endif %}
+{% endblock %}

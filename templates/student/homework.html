@@ -1,0 +1,29 @@
+{% extends "student/base.html" %}
+
+{% block title %}Домашнее задание{% endblock %}
+
+{% block content %}
+<h2>Домашнее задание (Класс ID: {{ class_id }})</h2>
+{% if homeworks %}
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Предмет</th>
+                <th>Задание</th>
+                <th>Дата сдачи</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for h in homeworks %}
+                <tr>
+                    <td>{{ h.subject_name }}</td>
+                    <td>{{ h.task }}</td>
+                    <td>{{ h.due_date }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p class="text-muted">Домашние задания отсутствуют.</p>
+{% endif %}
+{% endblock %}

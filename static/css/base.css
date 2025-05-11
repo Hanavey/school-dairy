@@ -62,3 +62,117 @@ body {
     left: 50%;
     transform: translateX(-50%);
 }
+
+
+.table-sm th, .table-sm td {
+    padding: 0.3rem;
+    vertical-align: middle;
+}
+
+.table-sm input, .table-sm select {
+    width: 100%;
+}
+
+.card-body {
+    padding: 1rem;
+}
+
+.btn-sm {
+    padding: 0.2rem 0.4rem;
+}
+
+form {
+    display: inline-block;
+}
+
+
+.index-container {
+    padding: 40px 20px;
+}
+
+.index-container h1 {
+    font-size: 2.5rem;
+    margin-bottom: 20px;
+}
+
+.index-container .lead {
+    font-size: 1.25rem;
+    margin-bottom: 30px;
+}
+
+.index-container .btn-lg {
+    padding: 12px 24px;
+    font-size: 1.2rem;
+}
+
+/* Стили для формы поиска */
+.input-group {
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.form-control {
+    background-color: #1b2c42;
+    color: #ffffff;
+    border: none;
+}
+
+.form-control::placeholder {
+    color: #ffffff;
+    opacity: 0.6;
+}
+
+.form-control:focus {
+    background-color: #2a3e5a;
+    box-shadow: none;
+    color: #ffffff;
+}
+
+/* Стили для ошибок формы */
+.text-danger {
+    color: #ff6b6b !important; /* Яркий красный для видимости на темном фоне */
+}
+
+/* Стили для статической карты */
+.map-image {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+}
+
+/* Скрытая ссылка для админов */
+.admin-link {
+    color: #ffffff;
+    opacity: 0.2;
+    transition: opacity 0.3s;
+}
+
+.admin-link:hover {
+    opacity: 1;
+    text-decoration: none;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .index-container h1 {
+        font-size: 2rem;
+    }
+
+    .index-container .btn-lg {
+        padding: 10px 20px;
+        font-size: 1rem;
+    }
+
+    .map-image {
+        max-width: 100%;
+    }
+
+    .input-group {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .input-group .btn {
+        width: 100%;
+    }
+}

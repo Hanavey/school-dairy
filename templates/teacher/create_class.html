@@ -1,0 +1,42 @@
+{% extends "teacher/base.html" %}
+
+{% block title %}Создать новый класс{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">Создать новый класс</h2>
+
+    {% if message %}
+    <div class="alert alert-{{ 'success' if status == 'success' else 'danger' }}">{{ message }}</div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('teacher.create_class') }}">
+                {{ form.hidden_tag() }}
+                <div class="mb-3">
+                    {{ form.class_name.label(class="form-label") }}
+                    {{ form.class_name(class="form-control") }}
+                    {% for error in form.class_name.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ form.teacher_id.label(class="form-label") }}
+                    <select name="teacher_id" class="form-control" required>
+                        <option value="" disabled selected>Выберите учителя</option>
+                        {% for teacher in teachers %}
+                        <option value="{{ teacher.teacher_id }}">{{ teacher.first_name }} {{ teacher.last_name }} (ID: {{ teacher.teacher_id }})</option>
+                        {% endfor %}
+                    </select>
+                    {% for error in form.teacher_id.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                {{ form.submit(class="btn btn-primary") }}
+                <a href="{{ url_for('teacher.classes') }}" class="btn btn-secondary">Отмена</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

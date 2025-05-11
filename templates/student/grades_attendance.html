@@ -1,0 +1,56 @@
+{% extends "student/base.html" %}
+
+{% block title %}Оценки и посещаемость{% endblock %}
+
+{% block content %}
+<h2>Оценки и посещаемость по предмету: {{ subject_name }}</h2>
+
+<h4>Оценки</h4>
+{% if average_grade is not none %}
+    <p><strong>Средний балл:</strong> {{ average_grade }}</p>
+{% else %}
+    <p class="text-muted">Средний балл отсутствует (нет оценок).</p>
+{% endif %}
+{% if grades %}
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Оценка</th>
+                <th>Дата</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for g in grades %}
+                <tr>
+                    <td>{{ g.grade }}</td>
+                    <td>{{ g.date }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p class="text-muted">Оценки отсутствуют.</p>
+{% endif %}
+
+<h4>Посещаемость</h4>
+{% if attendance %}
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Дата</th>
+                <th>Статус</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for a in attendance %}
+                <tr>
+                    <td>{{ a.date }}</td>
+                    <td>{{ a.status }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p class="text-muted">Записи о посещаемости отсутствуют.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends "teacher/base.html" %}
+
+{% block title %}Управление классами{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">Ваши классы</h2>
+
+    {% if is_head_teacher %}
+    <div class="mb-4">
+        <a href="{{ url_for('teacher.create_class') }}" class="btn btn-primary">Добавить новый класс</a>
+    </div>
+    {% endif %}
+
+    <!-- Список классов в виде карточек -->
+    <div class="row">
+        {% for class in classes %}
+        <div class="col-md-4 mb-3">
+            <div class="card">
+                <div class="card-body">
+                    <a href="/teacher/class/{{ class.class_id }}"><h5 class="card-title">{{ class.class_name }}</h5>
+                        <p class="card-text">ID класса: {{ class.class_id }}</p></a>
+                    {% if is_head_teacher %}
+                    <a href="{{ url_for('teacher.add_students', class_id=class.class_id) }}" class="btn btn-primary btn-sm mb-2">Добавить ученика</a>
+                    <a href="{{ url_for('teacher.confirm_delete_class', class_id=class.class_id) }}" class="btn btn-danger btn-sm">Удалить</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="col-12">
+            <p>Классы не найдены.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

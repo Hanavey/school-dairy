@@ -1,0 +1,32 @@
+{% extends "teacher/base.html" %}
+{% block title %}Расписание{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>Расписание учителя</h2>
+    {% if schedules %}
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>День недели</th>
+                    <th>Время</th>
+                    <th>Класс</th>
+                    <th>Предмет</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for schedule in schedules %}
+                    <tr>
+                        <td>{{ schedule.day_of_week }}</td>
+                        <td>{{ schedule.start_time }} - {{ schedule.end_time }}</td>
+                        <td>{{ schedule.class_.class_name }}</td>
+                        <td>{{ schedule.subject.subject_name }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>Расписание отсутствует.</p>
+    {% endif %}
+    <a href="{{ url_for('teacher.index') }}" class="btn btn-secondary">Вернуться</a>
+</div>
+{% endblock %}
