@@ -120,6 +120,7 @@ def index():
                 map_url = f"https://static-maps.yandex.ru/1.x/?ll={default_coords}&z=15&l=map&size=600,400&pt={default_coords},pm2rdm&apikey=81b63ec7-b5bf-4e94-97fd-5645a56b1305"
             else:
                 default_address = "Адрес не найден"
+                map_url = None
         except Exception as e:
             default_address = f"Ошибка при поиске адреса: {str(e)}"
 

@@ -57,7 +57,11 @@
                     <div class="card">
                         <div class="card-body">
                             <h3>Карта</h3>
-                            <img src="{{ map_url }}" alt="Карта школы" class="map-image">
+                                {% if map_url %}
+                                    <img src="{{ map_url }}" alt="Карта школы" class="map-image">
+                                {% else %}
+                                    <h1>Адрес не найден</h1>
+                                {% endif %}
                         </div>
                     </div>
                 </div>
