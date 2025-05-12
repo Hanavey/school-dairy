@@ -158,7 +158,6 @@ def class_management(class_id, subject_id):
                         json=json_data,
                         headers={'Authorization': request.headers.get('Authorization', '')}
                 ):
-                    # Декораторы получат доступ к новому контексту
                     if method == 'post':
                         return resource.post()
                     elif method == 'put':
@@ -547,7 +546,7 @@ def my_class_full_report():
             logging.error(f"GET /my_class/full_report - Error: {response[0]['description']}")
             flash(response[0]['description'], 'danger')
             print('\n\n', response[0]['description'], 'danger', '\n\n')
-            return redirect(url_for('teacher.index'))  # Перенаправление на главную страницу учителя
+            return redirect(url_for('teacher.index'))
 
         logging.info(f"Full class report successfully generated for user {current_user.username}")
         return response
@@ -555,7 +554,7 @@ def my_class_full_report():
     except Exception as e:
         logging.error(f"GET /my_class/full_report - Error: {str(e)} for user {current_user.username}")
         flash(f'Ошибка: {str(e)}', 'danger')
-        return redirect(url_for('teacher.index'))  # Перенаправление на главную страницу учителя
+        return redirect(url_for('teacher.index'))
     finally:
         db_sess.close()
 

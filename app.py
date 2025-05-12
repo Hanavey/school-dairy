@@ -38,7 +38,6 @@ db_session.global_init("db/school_diary.db")
 
 migrate = Migrate(app, db_session.get_engine(), render_as_batch=True)
 
-# Инициализация Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
 
@@ -47,12 +46,11 @@ def load_user(user_id):
     db_sess = db_session.create_session()
     return db_sess.query(User).get(int(user_id))
 
-# Регистрация blueprints
 app.register_blueprint(student_bp, url_prefix='/student')
 app.register_blueprint(teacher_bp, url_prefix='/teacher')
 app.register_blueprint(admin_bp, url_prefix='/admin')
 
-# Инициализация Flask-RESTful API
+
 api = Api(app)
 api.add_resource(AdminOneStudentAPI, '/api/admin/student/<int:student_id>', '/api/admin/student')
 api.add_resource(AdminAllStudentsAPI, '/api/admin/students/<string:search>', '/api/admin/students')
@@ -86,37 +84,30 @@ api.add_resource(StudentHomeworkResource, '/api/student/homework')
 api.add_resource(ClassmatesResource, '/api/student/classmates')
 
 
-# Простая главная страница (опционально)
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    # Инициализация формы
     form = AddressSearchForm()
 
-    # Параметры по умолчанию для карты
-    default_center = '37.6173,55.7558'  # Москва
+    default_center = '37.6173,55.7558'
     default_address = 'Москва, центр'
     default_coords = default_center
-    map_url = f"https://static-maps.yandex.ru/1.x/?ll={default_center}&z=15&l=map&size=600,400&pt={default_center},pm2rdm&apikey=ВАШ_API_КЛЮЧ"
+    map_url = f"https://static-maps.yandex.ru/1.x/?ll={default_center}&z=15&l=map&size=600,400&pt={default_center},pm2rdm&apikey=81b63ec7-b5bf-4e94-97fd-5645a56b1305"
 
-    # Обработка формы
     if form.validate_on_submit():
         address = form.address.data
         try:
-            # Запрос к Яндекс.Геокодеру
             geocoder_url = f"https://geocode-maps.yandex.ru/1.x/?apikey=191ba092-d250-414d-b5ec-bf6ac8d9a224&geocode={urllib.parse.quote(address)}&format=json"
             response = requests.get(geocoder_url)
             response.raise_for_status()
             geocoder_data = response.json()
 
-            # Извлечение координат и адреса
             feature = geocoder_data['response']['GeoObjectCollection']['featureMember']
             if feature:
-                point = feature[0]['GeoObject']['Point']['pos']  # Формат: "долгота широта"
+                point = feature[0]['GeoObject']['Point']['pos']
                 longitude, latitude = point.split()
                 default_coords = f"{longitude},{latitude}"
                 default_address = feature[0]['GeoObject']['metaDataProperty']['GeocoderMetaData']['text']
 
-                # Генерация URL для статической карты
                 map_url = f"https://static-maps.yandex.ru/1.x/?ll={default_coords}&z=15&l=map&size=600,400&pt={default_coords},pm2rdm&apikey=81b63ec7-b5bf-4e94-97fd-5645a56b1305"
             else:
                 default_address = "Адрес не найден"

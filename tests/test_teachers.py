@@ -20,7 +20,6 @@ RESULTS_DIR = "teacher_test_results"
 created_resources = []
 console = Console(force_terminal=True)
 
-# Создание директории для результатов
 if not os.path.exists(RESULTS_DIR):
     os.makedirs(RESULTS_DIR)
 
@@ -108,7 +107,6 @@ def test_teacher_classes():
             },
             headers=headers_head_teacher
         )),
-        # ("TeacherClassesAPI - Valid DELETE (Head Teacher)", lambda: requests.delete(f"{BASE_URL}/api/teachers/classes/12", headers=headers_head_teacher)),
         # Тесты для обычного учителя
         ("TeacherClassesAPI - Valid GET (Teacher)", lambda: requests.get(f"{BASE_URL}/api/teachers/classes", headers=headers_teacher)),
         ("TeacherClassesAPI - Invalid POST (Teacher, No Permission)", lambda: requests.post(

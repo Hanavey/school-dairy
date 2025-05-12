@@ -16,7 +16,6 @@ logging.basicConfig(
     format='%(asctime)s [%(levelname)s] - %(message)s'
 )
 
-# Определяем порядок дней недели
 DAY_ORDER = {
     'Понедельник': 1,
     'Вторник': 2,
@@ -35,13 +34,11 @@ class TeacherScheduleResource(Resource):
         """Получение расписания уроков учителя, отсортированного по дню недели и времени."""
         db_sess = db_session.create_session()
         try:
-            # Находим учителя
             teacher = db_sess.query(Teacher).join(User).filter(User.username == username).first()
             if not teacher:
                 logging.error(f"GET /api/teacher_schedule - Teacher {username} not found")
                 return {"status": "error", "description": "Учитель не найден"}, 404
 
-            # Получение расписания учителя
             schedule = db_sess.query(Schedule).join(Subject).join(Class).filter(Schedule.teacher_id == teacher.teacher_id).all()
             schedule_data = [
                 {
@@ -53,12 +50,11 @@ class TeacherScheduleResource(Resource):
                     'day_of_week': s.day_of_week,
                     'start_time': s.start_time,
                     'end_time': s.end_time,
-                    'day_order': DAY_ORDER.get(s.day_of_week, 8)  # Для неизвестных дней
+                    'day_order': DAY_ORDER.get(s.day_of_week, 8)
                 }
                 for s in schedule
             ]
 
-            # Сортировка по дню недели и времени начала
             schedule_data.sort(key=lambda x: (x['day_order'], x['start_time']))
 
             return {

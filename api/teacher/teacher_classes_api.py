@@ -54,7 +54,7 @@ class TeacherClassesAPI(Resource):
                 classes = (db_sess.query(Class)
                            .options(joinedload(Class.teacher))
                            .all())
-            else:  # Предметник
+            else:
                 classes = (db_sess.query(Class)
                            .join(Schedule, Class.class_id == Schedule.class_id)
                            .filter(Schedule.teacher_id == user.teacher.teacher_id)

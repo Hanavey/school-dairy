@@ -40,12 +40,10 @@ class GradeResource(Resource):
 
         db_sess = db_session.create_session()
         try:
-            # Проверка существования класса
             if not db_sess.query(Class).filter(Class.class_id == class_id).first():
                 logging.error(f"GET /api/grades - Class {class_id} not found for user {username}")
                 return {"status": "error", "description": "Класс не найден"}, 404
 
-            # Проверка доступа (оставляем для дополнительной безопасности)
             if position_name != "Завуч":
                 teacher = db_sess.query(Teacher).join(User).filter(User.username == username).first()
                 if not teacher:
@@ -59,9 +57,7 @@ class GradeResource(Resource):
                     logging.error(f"GET /api/grades - Teacher {username} not authorized for class {class_id}")
                     return {"status": "error", "description": "Нет доступа к этому классу"}, 403
 
-            # Получение оценок
             grades = db_sess.query(Grade).join(Student).filter(Student.class_id == class_id).all()
-            # Ручная сериализация
             grades_data = [
                 {
                     'grade_id': grade.grade_id,
@@ -86,7 +82,6 @@ class GradeResource(Resource):
             logging.error(f"POST /api/grades - Missing required fields for user {username}")
             return {"status": "error", "description": "Отсутствуют обязательные поля"}, 400
 
-        # Валидация полей
         if not isinstance(data['grade'], int) or data['grade'] < 2 or data['grade'] > 5:
             logging.error(f"POST /api/grades - Invalid grade value: {data['grade']} for user {username}")
             return {"status": "error", "description": "Оценка должна быть целым числом от 2 до 5"}, 400
@@ -104,7 +99,6 @@ class GradeResource(Resource):
                 logging.error(f"POST /api/grades - Subject {data['subject_id']} not found for user {username}")
                 return {"status": "error", "description": "Предмет не найден"}, 404
 
-            # Проверка доступа
             if position_name != "Завуч":
                 teacher = db_sess.query(Teacher).join(User).filter(User.username == username).first()
                 if not teacher:
@@ -127,7 +121,6 @@ class GradeResource(Resource):
             db_sess.add(grade)
             db_sess.commit()
             logging.info(f"POST /api/grades - Grade added for student {data['student_id']} by {username}")
-            # Ручная сериализация
             grade_data = {
                 'grade_id': grade.grade_id,
                 'student_id': grade.student_id,
@@ -153,7 +146,6 @@ class GradeResource(Resource):
             logging.error(f"PUT /api/grades - Missing required fields for user {username}")
             return {"status": "error", "description": "Отсутствуют обязательные поля"}, 400
 
-        # Валидация полей
         if not isinstance(data['grade'], int) or data['grade'] < 2 or data['grade'] > 5:
             logging.error(f"PUT /api/grades - Invalid grade value: {data['grade']} for user {username}")
             return {"status": "error", "description": "Оценка должна быть целым числом от 2 до 5"}, 400
@@ -176,7 +168,6 @@ class GradeResource(Resource):
                 logging.error(f"PUT /api/grades - Subject {data['subject_id']} not found for user {username}")
                 return {"status": "error", "description": "Предмет не найден"}, 404
 
-            # Проверка доступа
             if position_name != "Завуч":
                 teacher = db_sess.query(Teacher).join(User).filter(User.username == username).first()
                 if not teacher:
@@ -196,7 +187,6 @@ class GradeResource(Resource):
             grade.date = datetime.strptime(data['date'], '%Y-%m-%d')
             db_sess.commit()
             logging.info(f"PUT /api/grades - Grade {data['grade_id']} updated by {username}")
-            # Ручная сериализация
             grade_data = {
                 'grade_id': grade.grade_id,
                 'student_id': grade.student_id,
@@ -232,7 +222,6 @@ class GradeResource(Resource):
                 logging.error(f"DELETE /api/grades - Student {grade.student_id} not found for user {username}")
                 return {"status": "error", "description": "Студент не найден"}, 404
 
-            # Проверка доступа
             if position_name != "Завуч":
                 teacher = db_sess.query(Teacher).join(User).filter(User.username == username).first()
                 if not teacher:
@@ -274,7 +263,6 @@ class HomeworkResource(Resource):
                 logging.error(f"GET /api/homework - Class {class_id} not found for user {username}")
                 return {"status": "error", "description": "Класс не найден"}, 404
 
-            # Проверка доступа
             if position_name != "Завуч":
                 teacher = db_sess.query(Teacher).join(User).filter(User.username == username).first()
                 if not teacher:
@@ -289,7 +277,6 @@ class HomeworkResource(Resource):
                     return {"status": "error", "description": "Нет доступа к этому классу"}, 403
 
             homeworks = db_sess.query(Homework).filter(Homework.class_id == class_id).all()
-            # Ручная сериализация
             homeworks_data = [
                 {
                     'homework_id': homework.homework_id,
@@ -327,7 +314,6 @@ class HomeworkResource(Resource):
                 logging.error(f"POST /api/homework - Subject {data['subject_id']} not found for user {username}")
                 return {"status": "error", "description": "Предмет не найден"}, 404
 
-            # Проверка доступа
             if position_name != "Завуч":
                 teacher = db_sess.query(Teacher).join(User).filter(User.username == username).first()
                 if not teacher:
@@ -350,7 +336,6 @@ class HomeworkResource(Resource):
             db_sess.add(homework)
             db_sess.commit()
             logging.info(f"POST /api/homework - Homework added for class {data['class_id']} by {username}")
-            # Ручная сериализация
             homework_data = {
                 'homework_id': homework.homework_id,
                 'subject_id': homework.subject_id,
@@ -383,7 +368,6 @@ class AttendanceResource(Resource):
                 logging.error(f"GET /api/attendance - Class {class_id} not found for user {username}")
                 return {"status": "error", "description": "Класс не найден"}, 404
 
-            # Проверка доступа
             if position_name != "Завуч":
                 teacher = db_sess.query(Teacher).join(User).filter(User.username == username).first()
                 if not teacher:
@@ -398,7 +382,6 @@ class AttendanceResource(Resource):
                     return {"status": "error", "description": "Нет доступа к этому классу"}, 403
 
             attendance = db_sess.query(Attendance).join(Student).filter(Student.class_id == class_id).all()
-            # Ручная сериализация
             attendance_data = [
                 {
                     'attendance_id': record.attendance_id,
@@ -436,7 +419,6 @@ class AttendanceResource(Resource):
                 logging.error(f"POST /api/attendance - Student {data['student_id']} not found for user {username}")
                 return {"status": "error", "description": "Студент не найден"}, 404
 
-            # Проверка доступа
             if position_name != "Завуч":
                 teacher = db_sess.query(Teacher).join(User).filter(User.username == username).first()
                 if not teacher:
@@ -458,7 +440,6 @@ class AttendanceResource(Resource):
             db_sess.add(attendance)
             db_sess.commit()
             logging.info(f"POST /api/attendance - Attendance added for student {data['student_id']} by {username}")
-            # Ручная сериализация
             attendance_data = {
                 'attendance_id': attendance.attendance_id,
                 'student_id': attendance.student_id,
@@ -502,7 +483,6 @@ class AttendanceResource(Resource):
                 logging.error(f"PUT /api/attendance - Student {data['student_id']} not found for user {username}")
                 return {"status": "error", "description": "Студент не найден"}, 404
 
-            # Проверка доступа
             if position_name != "Завуч":
                 teacher = db_sess.query(Teacher).join(User).filter(User.username == username).first()
                 if not teacher:
@@ -521,7 +501,6 @@ class AttendanceResource(Resource):
             attendance.status = data['status']
             db_sess.commit()
             logging.info(f"PUT /api/attendance - Attendance {data['attendance_id']} updated by {username}")
-            # Ручная сериализация
             attendance_data = {
                 'attendance_id': attendance.attendance_id,
                 'student_id': attendance.student_id,

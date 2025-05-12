@@ -27,19 +27,16 @@ class ClassTeacherResource(Resource):
         """Получение информации об учениках и расписании класса, где пользователь является классным руководителем."""
         db_sess = db_session.create_session()
         try:
-            # Находим учителя
             teacher = db_sess.query(Teacher).join(User).filter(User.username == username).first()
             if not teacher:
                 logging.error(f"GET /api/class_teacher - Teacher {username} not found")
                 return {"status": "error", "description": "Учитель не найден"}, 404
 
-            # Находим класс, где учитель является классным руководителем
             class_ = db_sess.query(Class).filter(Class.teacher_id == teacher.teacher_id).first()
             if not class_:
                 logging.error(f"GET /api/class_teacher - No class found for teacher {username}")
                 return {"status": "error", "description": "Вы не являетесь классным руководителем ни одного класса"}, 404
 
-            # Получение учеников класса
             students = db_sess.query(Student).join(User).filter(Student.class_id == class_.class_id).all()
             students_data = [
                 {
@@ -73,7 +70,6 @@ class ClassTeacherResource(Resource):
                 for student in students
             ]
 
-            # Получение расписания класса
             schedule = db_sess.query(Schedule).join(Subject).filter(Schedule.class_id == class_.class_id).all()
             schedule_data = [
                 {

@@ -22,7 +22,6 @@ def global_init(db_file):
 
     engine = sa.create_engine(conn_str, echo=True)
 
-    # Включаем внешние ключи
     def _fk_pragma_on_connect(dbapi_con, con_record):
         dbapi_con.execute('PRAGMA foreign_keys=ON')
 

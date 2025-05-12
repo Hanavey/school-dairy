@@ -13,11 +13,9 @@ class GradesForm(FlaskForm):
     add_date = SubmitField('Добавить дату')
 
     def validate(self):
-        # Базовая валидация WTForms
         if not super(GradesForm, self).validate():
             return False
 
-        # Проверяем, есть ли данные в форме или динамических полях
         has_data = (
             self.homework_task.data or
             self.homework_due_date.data or

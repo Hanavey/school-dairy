@@ -13,7 +13,6 @@ logging.basicConfig(
 )
 
 class UserSettingsAPI(Resource):
-    # Парсер для PATCH-запросов
     settings_parser = reqparse.RequestParser()
     settings_parser.add_argument('first_name', type=str)
     settings_parser.add_argument('last_name', type=str)
@@ -26,13 +25,11 @@ class UserSettingsAPI(Resource):
         """Получение данных профиля пользователя."""
         db_sess = db_session.create_session()
         try:
-            # Проверяем, существует ли пользователь
             user = db_sess.query(User).filter(User.user_id == user_id).first()
             if not user:
                 logging.error(f'GET /api/user/settings/{user_id} - Not found for user {username}')
                 return {'description': f'Пользователь с id {user_id} не найден.'}, 404
 
-            # Проверяем, что пользователь запрашивает свой профиль
             if user.username != username:
                 logging.error(f'GET /api/user/settings/{user_id} - Access denied for user {username}')
                 return {'description': 'Вы можете просматривать только свой профиль.'}, 403
@@ -46,7 +43,7 @@ class UserSettingsAPI(Resource):
                     'last_name': user.last_name,
                     'email': user.email,
                     'phone_number': user.phone_number,
-                    'profile_picture': user.profile_picture  # Base64 строка
+                    'profile_picture': user.profile_picture
                 }
             }, 200
 
@@ -62,22 +59,18 @@ class UserSettingsAPI(Resource):
         """Обновление профиля пользователя."""
         db_sess = db_session.create_session()
         try:
-            # Проверяем, существует ли пользователь
             user = db_sess.query(User).filter(User.user_id == user_id).first()
             if not user:
                 logging.error(f'PATCH /api/user/settings/{user_id} - Not found for user {username}')
                 return {'description': f'Пользователь с id {user_id} не найден.'}, 404
 
-            # Проверяем, что пользователь редактирует свой профиль
             if user.username != username:
                 logging.error(f'PATCH /api/user/settings/{user_id} - Access denied for user {username}')
                 return {'description': 'Вы можете редактировать только свой профиль.'}, 403
 
-            # Если update_data передано (например, из маршрута), используем его
             if update_data is not None:
                 args = update_data
             else:
-                # Парсим данные из запроса
                 content_type = request.headers.get('Content-Type', '')
                 if 'application/json' in content_type:
                     args = self.settings_parser.parse_args()
@@ -86,7 +79,6 @@ class UserSettingsAPI(Resource):
                     for key in ['first_name', 'last_name', 'email', 'phone_number', 'password']:
                         if key in request.form:
                             args[key] = request.form[key]
-                    # Обработка фото, если загружено
                     if 'profile_picture' in request.files:
                         file = request.files['profile_picture']
                         if file:

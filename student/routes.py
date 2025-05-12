@@ -90,9 +90,7 @@ def grades_attendance_select():
         flash(response.get('description', 'Ошибка при получении данных'), 'danger')
         return render_template('student/grades_attendance_select.html', subjects=[])
 
-    # Извлекаем уникальные предметы из расписания
     schedule = response['data']['schedule']
-    # Используем словарь для уникальности по subject_id
     subjects_dict = {s['subject_id']: {'subject_id': s['subject_id'], 'subject_name': s['subject_name']} for s in
                      schedule}
     subjects = list(subjects_dict.values())

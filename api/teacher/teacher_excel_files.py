@@ -18,7 +18,7 @@ from openpyxl.styles import Font, Alignment
 
 logging.basicConfig(
     filename='api_access.log',
-    level=logging.DEBUG,  # Установлен DEBUG для отладки
+    level=logging.DEBUG,
     format='%(asctime)s [%(levelname)s] - %(message)s'
 )
 
@@ -137,9 +137,8 @@ class ClassFullReportResource(Resource):
         logging.debug(f"Starting ClassFullReportResource.get for user={username}")
 
         try:
-            # Получение данных через ClassTeacherResource
             class_teacher_resource = ClassTeacherResource()
-            response, status = class_teacher_resource.get()
+            response, status = class_teacher_resource.get(position_name=position_name)
             if status != 200:
                 logging.error(f"GET /api/my_class_full_report - Failed to get class data: {response['description']}")
                 return response, status
@@ -151,12 +150,10 @@ class ClassFullReportResource(Resource):
             logging.debug(
                 f"Class data retrieved: class_id={class_data['class_id']}, students={len(students_data)}, schedule={len(schedule_data)}")
 
-            # 1. Данные для листа "Расписание"
             schedule_df_data = [
                 {
                     "День недели": s['day_of_week'],
-                    "Время": f"{s['start_time']}-{s['end_time']}" if s['start_time'] and s[
-                        'end_time'] else "Не указано",
+                    "Время": f"{s['start_time']}-{s['end_time']}" if s['start_time'] and s['end_time'] else "Не указано",
                     "Предмет": s['subject_name'],
                     "Учитель": s['teacher_name']
                 }
@@ -165,16 +162,32 @@ class ClassFullReportResource(Resource):
             schedule_df = pd.DataFrame(schedule_df_data)
             logging.debug(f"Schedule data: {len(schedule_df_data)} entries")
 
-            # 2. Данные для листа "Оценки"
+            subjects = set()
+            for student in students_data:
+                for grade in student['grades']:
+                    subjects.add(grade['subject_name'])
+            subjects = sorted(subjects)  # Сортируем для единообразия
+            logging.debug(f"Unique subjects: {subjects}")
+
+            # Формируем данные для таблицы оценок
             grades_df_data = []
             for student in students_data:
                 full_name = f"{student['first_name']} {student['last_name']}"
-                grades_str = "; ".join([str(g['grade']) for g in student['grades']]) or "Нет оценок"
-                grades_df_data.append({
-                    "ФИО ученика": full_name,
-                    "Оценки": grades_str
-                })
-                logging.debug(f"Student {full_name}: grades_str={grades_str}")
+                student_row = {"ФИО ученика": full_name}
+                # Инициализируем пустые значения для каждого предмета
+                for subject in subjects:
+                    student_row[subject] = ""
+                # Заполняем оценки по предметам
+                for grade in student['grades']:
+                    subject_name = grade['subject_name']
+                    if subject_name in student_row:
+                        # Добавляем оценку в соответствующую колонку
+                        if student_row[subject_name]:
+                            student_row[subject_name] += f", {grade['grade']}"
+                        else:
+                            student_row[subject_name] = str(grade['grade'])
+                grades_df_data.append(student_row)
+                logging.debug(f"Student {full_name}: grades={student_row}")
             grades_df = pd.DataFrame(grades_df_data)
 
             # 3. Данные для листа "Посещаемость"
@@ -225,7 +238,8 @@ class ClassFullReportResource(Resource):
                     cell.font = Font(bold=True)
                     cell.alignment = Alignment(horizontal='center')
                 worksheet.column_dimensions['A'].width = 30
-                worksheet.column_dimensions['B'].width = 40
+                for idx, subject in enumerate(subjects, 2):  # Начинаем с колонки B
+                    worksheet.column_dimensions[chr(64 + idx)].width = 20
 
                 # Лист 3: Посещаемость
                 attendance_df.to_excel(writer, sheet_name="Посещаемость", index=False)

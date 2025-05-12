@@ -21,7 +21,6 @@ class User(SqlAlchemyBase, UserMixin, SerializerMixin):
     profile_picture = sqlalchemy.Column(sqlalchemy.String, nullable=False)
     api_key = sqlalchemy.Column(sqlalchemy.String, nullable=True, unique=True)
 
-    # Связь с таблицами Teachers и Students
     teacher = orm.relationship("Teacher", back_populates="user", uselist=False)
     student = orm.relationship("Student", back_populates="user", uselist=False)
     admin_ = orm.relationship("Admin", back_populates="user", uselist=False)
@@ -38,7 +37,7 @@ class User(SqlAlchemyBase, UserMixin, SerializerMixin):
         return check_password_hash(self.password_hash, password)
 
     def generate_api_key(self):
-        self.api_key = str(uuid.uuid4())  # Генерируем уникальный API-ключ
+        self.api_key = str(uuid.uuid4())
         return self.api_key
 
     def get_id(self):

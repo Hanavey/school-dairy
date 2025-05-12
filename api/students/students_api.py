@@ -20,13 +20,11 @@ class StudentScheduleResource(Resource):
         """Получение расписания уроков для студента, сортировка по дню недели."""
         db_sess = db_session.create_session()
         try:
-            # Находим студента
             student = db_sess.query(Student).join(User).filter(User.username == username).first()
             if not student:
                 logging.error(f"GET /api/student/schedule - Student {username} not found")
                 return {"status": "error", "description": "Студент не найден"}, 404
 
-            # Определяем порядок дней недели
             day_order = {
                 'Понедельник': 1,
                 'Вторник': 2,
@@ -37,7 +35,6 @@ class StudentScheduleResource(Resource):
                 'Воскресенье': 7
             }
 
-            # Получение расписания для класса студента с сортировкой по дню недели и subject_id
             schedule = (
                 db_sess.query(Schedule)
                 .join(Subject)
@@ -86,19 +83,16 @@ class StudentGradesAttendanceResource(Resource):
         """Получение оценок, посещаемости и среднего балла по subject_id для студента."""
         db_sess = db_session.create_session()
         try:
-            # Находим студента
             student = db_sess.query(Student).join(User).filter(User.username == username).first()
             if not student:
                 logging.error(f"GET /api/student/grades_attendance - Student {username} not found")
                 return {"status": "error", "description": "Студент не найден"}, 404
 
-            # Проверяем существование предмета
             subject = db_sess.query(Subject).filter(Subject.subject_id == subject_id).first()
             if not subject:
                 logging.error(f"GET /api/student/grades_attendance - Subject {subject_id} not found")
                 return {"status": "error", "description": "Предмет не найден"}, 404
 
-            # Получение оценок
             grades = (
                 db_sess.query(Grade)
                 .filter(Grade.student_id == student.user_id, Grade.subject_id == subject_id)
@@ -113,13 +107,11 @@ class StudentGradesAttendanceResource(Resource):
                 for g in grades
             ]
 
-            # Расчет среднего балла
             average_grade = None
             if grades:
                 average_grade = sum(g.grade for g in grades) / len(grades)
-                average_grade = round(average_grade, 2)  # Округляем до 2 знаков после запятой
+                average_grade = round(average_grade, 2)
 
-            # Получение посещаемости
             attendance = (
                 db_sess.query(Attendance)
                 .filter(Attendance.student_id == student.user_id)
@@ -158,13 +150,11 @@ class StudentHomeworkResource(Resource):
         """Получение домашнего задания для класса студента."""
         db_sess = db_session.create_session()
         try:
-            # Находим студента
             student = db_sess.query(Student).join(User).filter(User.username == username).first()
             if not student:
                 logging.error(f"GET /api/student/homework - Student {username} not found")
                 return {"status": "error", "description": "Студент не найден"}, 404
 
-            # Получение домашнего задания для класса
             homeworks = (
                 db_sess.query(Homework)
                 .join(Subject)
@@ -206,13 +196,11 @@ class ClassmatesResource(Resource):
         """Получение списка одноклассников (имя, фамилия, телефон, email) для студента."""
         db_sess = db_session.create_session()
         try:
-            # Находим текущего студента
             current_student = db_sess.query(Student).join(User).filter(User.username == username).first()
             if not current_student:
                 logging.error(f"GET /api/student/classmates - Student {username} not found")
                 return {"status": "error", "description": "Студент не найден"}, 404
 
-            # Получаем всех студентов из того же класса, исключая текущего
             classmates = (
                 db_sess.query(Student)
                 .join(User)
