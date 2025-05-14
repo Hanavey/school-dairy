@@ -1,4 +1,3 @@
-# teacher/teacher_schedule_api.py
 from flask_restful import Resource
 from flask import request
 from data import db_session
